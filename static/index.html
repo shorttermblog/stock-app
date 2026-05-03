@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Stock App</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 
   <style>
     body {
@@ -91,14 +91,14 @@
       background: #1e293b;
       padding: 20px;
       border-radius: 16px;
-      height: 480px;
+      height: 520px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.25);
       margin-bottom: 30px;
     }
 
-    canvas {
-      width: 100% !important;
-      height: 100% !important;
+    #chart {
+      width: 100%;
+      height: 100%;
     }
 
     .news {
@@ -151,7 +151,7 @@
     </div>
 
     <div class="chart-box">
-      <canvas id="chart"></canvas>
+      <div id="chart"></div>
     </div>
 
     <div class="news">
@@ -161,8 +161,6 @@
   </div>
 
 <script>
-let chart;
-
 async function load() {
   const t = document.getElementById("ticker").value.trim();
   const s = document.getElementById("start").value;
@@ -185,39 +183,114 @@ async function load() {
   document.getElementById("tickerCard").innerText = data.ticker;
   document.getElementById("priceCard").innerText = `$${data.price}`;
   changeEl.innerText = `${data.change} (${data.change_pct}%)`;
-
   changeEl.className = "value " + (data.change >= 0 ? "positive" : "negative");
 
-  const labels = data.prices.map(p => p.date);
-  const prices = data.prices.map(p => p.close);
+  const dates = data.prices.map(p => p.date);
 
-  const ctx = document.getElementById("chart").getContext("2d");
+  const candle = {
+    x: dates,
+    open: data.prices.map(p => p.open),
+    high: data.prices.map(p => p.high),
+    low: data.prices.map(p => p.low),
+    close: data.prices.map(p => p.close),
+    type: "candlestick",
+    name: "OHLC",
+    increasing: { line: { color: "#22c55e" } },
+    decreasing: { line: { color: "#ef4444" } }
+  };
 
-  const gradient = ctx.createLinearGradient(0, 0, 0, 450);
-  gradient.addColorStop(0, "rgba(37, 99, 235, 0.35)");
-  gradient.addColorStop(1, "rgba(37, 99, 235, 0)");
+  const ma20 = {
+    x: dates,
+    y: data.prices.map(p => p.ma20),
+    type: "scatter",
+    mode: "lines",
+    name: "MA20",
+    line: {
+      color: "#60a5fa",
+      width: 2
+    }
+  };
 
-  if (chart) chart.destroy();
+  const bbUpper = {
+    x: dates,
+    y: data.prices.map(p => p.bb_upper),
+    type: "scatter",
+    mode: "lines",
+    name: "Bollinger Upper",
+    line: {
+      color: "#a78bfa",
+      width: 1,
+      dash: "dot"
+    }
+  };
 
-  chart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [{
-        label: `${data.ticker} Close Price`,
-        data: prices,
-        borderColor: "#3b82f6",
-        backgroundColor: gradient,
-        borderWidth: 2,
-        fill: true,
-        tension: 0.25,
-        pointRadius: 0,
-        pointHoverRadius: 5,
-        pointHoverBackgroundColor: "#ffffff"
-      }]
+  const bbLower = {
+    x: dates,
+    y: data.prices.map(p => p.bb_lower),
+    type: "scatter",
+    mode: "lines",
+    name: "Bollinger Lower",
+    line: {
+      color: "#a78bfa",
+      width: 1,
+      dash: "dot"
     },
-    options: {
-      responsive: true,
+    fill: "tonexty",
+    fillcolor: "rgba(167, 139, 250, 0.08)"
+  };
+
+  const layout = {
+    paper_bgcolor: "#1e293b",
+    plot_bgcolor: "#1e293b",
+    font: {
+      color: "#e5e7eb"
+    },
+    margin: {
+      l: 55,
+      r: 30,
+      t: 30,
+      b: 40
+    },
+    xaxis: {
+      rangeslider: {
+        visible: false
+      },
+      gridcolor: "rgba(148, 163, 184, 0.12)"
+    },
+    yaxis: {
+      title: "Price",
+      gridcolor: "rgba(148, 163, 184, 0.12)"
+    },
+    legend: {
+      orientation: "h",
+      y: 1.08,
+      x: 0
+    },
+    hovermode: "x unified"
+  };
+
+  const config = {
+    responsive: true,
+    displayModeBar: true
+  };
+
+  Plotly.react("chart", [candle, ma20, bbUpper, bbLower], layout, config);
+
+  const newsEl = document.getElementById("news");
+  newsEl.innerHTML = "";
+
+  data.news.forEach(n => {
+    const li = document.createElement("li");
+    li.innerHTML = `<a href="${n.link}" target="_blank">${n.title}</a>`;
+    newsEl.appendChild(li);
+  });
+}
+
+load();
+</script>
+
+</body>
+</html>
       maintainAspectRatio: false,
       interaction: {
         mode: "index",
