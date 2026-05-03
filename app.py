@@ -17,7 +17,7 @@ def home():
 
 
 # 🔹 funzione per Google News RSS
-def get_google_news(ticker: str, company_name: str = "", max_news: int = 5):
+def get_google_news(ticker: str, company_name: str = "", max_news: int = 10):
     query = f'"{ticker}" "{company_name}" stock OR earnings when:1d'
     encoded_query = quote(query)
 
