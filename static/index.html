@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Stock App</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<h1>Stock App</h1>
+
+<input id="ticker" value="AAPL">
+<input id="start" type="date">
+<input id="end" type="date">
+<button onclick="load()">Carica</button>
+
+<h2 id="info"></h2>
+
+<canvas id="chart"></canvas>
+
+<h3>News</h3>
+<ul id="news"></ul>
+
+<script>
+let chart;
+
+async function load() {
+  const t = document.getElementById("ticker").value;
+  const s = document.getElementById("start").value;
+  const e = document.getElementById("end").value;
+
+  let url = `/api/stock?ticker=${t}`;
+  if (s) url += `&start=${s}`;
+  if (e) url += `&end=${e}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (data.error) {
+    alert(data.error);
+    return;
+  }
+
+  document.getElementById("info").innerText =
+    `${data.ticker} | Prezzo: ${data.price} | Δ ${data.change} (${data.change_pct}%)`;
+
+  const labels = data.prices.map(p => p.date);
+  const prices = data.prices.map(p => p.close);
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(document.getElementById("chart"), {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [{ label: "Price", data: prices }]
+    }
+  });
+
+  const newsEl = document.getElementById("news");
+  newsEl.innerHTML = "";
+
+  data.news.forEach(n => {
+    const li = document.createElement("li");
+    li.innerHTML = `<a href="${n.link}" target="_blank">${n.title}</a>`;
+    newsEl.appendChild(li);
+  });
+}
+
+load();
+</script>
+
+</body>
+</html>
