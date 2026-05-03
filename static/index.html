@@ -88,6 +88,25 @@
       color: #ef4444;
     }
 
+    .chart-toggle {
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .chart-toggle label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #e5e7eb;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .chart-toggle input {
+      padding: 0;
+    }
+
     .chart-box {
       background: #ffffff;
       padding: 20px;
@@ -151,6 +170,13 @@
       </div>
     </div>
 
+    <div class="chart-toggle">
+      <label>
+        <input type="checkbox" id="toggleBB">
+        Bollinger Bands
+      </label>
+    </div>
+
     <div class="chart-box">
       <div id="chart"></div>
     </div>
@@ -163,6 +189,8 @@
 
 <script>
 let chart;
+let bbUpperSeries = null;
+let bbLowerSeries = null;
 
 async function load() {
   const t = document.getElementById("ticker").value.trim();
@@ -231,7 +259,7 @@ async function load() {
 
   const ma20 = chart.addLineSeries({
     color: "#2563eb",
-    lineWidth: 2,
+    lineWidth: 1,
     priceLineVisible: false,
     lastValueVisible: false
   });
@@ -242,40 +270,39 @@ async function load() {
       .map(p => ({ time: p.date, value: p.ma20 }))
   );
 
-  const bbUpper = chart.addLineSeries({
+  bbUpperSeries = chart.addLineSeries({
     color: "#7c3aed",
     lineWidth: 1,
     priceLineVisible: false,
-    lastValueVisible: false
+    lastValueVisible: false,
+    visible: false
   });
 
-  bbUpper.setData(
+  bbUpperSeries.setData(
     data.prices
       .filter(p => p.bb_upper !== null)
       .map(p => ({ time: p.date, value: p.bb_upper }))
   );
 
-  const bbLower = chart.addLineSeries({
+  bbLowerSeries = chart.addLineSeries({
     color: "#7c3aed",
     lineWidth: 1,
     priceLineVisible: false,
-    lastValueVisible: false
+    lastValueVisible: false,
+    visible: false
   });
 
-  bbLower.setData(
+  bbLowerSeries.setData(
     data.prices
       .filter(p => p.bb_lower !== null)
       .map(p => ({ time: p.date, value: p.bb_lower }))
   );
 
-  chart.timeScale().fitContent();
+  const showBB = document.getElementById("toggleBB").checked;
+  bbUpperSeries.applyOptions({ visible: showBB });
+  bbLowerSeries.applyOptions({ visible: showBB });
 
-  window.addEventListener("resize", () => {
-    chart.applyOptions({
-      width: chartContainer.clientWidth,
-      height: chartContainer.clientHeight
-    });
-  });
+  chart.timeScale().fitContent();
 
   const newsEl = document.getElementById("news");
   newsEl.innerHTML = "";
@@ -286,6 +313,26 @@ async function load() {
     newsEl.appendChild(li);
   });
 }
+
+document.getElementById("toggleBB").addEventListener("change", function () {
+  const show = this.checked;
+
+  if (bbUpperSeries && bbLowerSeries) {
+    bbUpperSeries.applyOptions({ visible: show });
+    bbLowerSeries.applyOptions({ visible: show });
+  }
+});
+
+window.addEventListener("resize", () => {
+  const chartContainer = document.getElementById("chart");
+
+  if (chart) {
+    chart.applyOptions({
+      width: chartContainer.clientWidth,
+      height: chartContainer.clientHeight
+    });
+  }
+});
 
 load();
 </script>
