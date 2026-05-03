@@ -1,30 +1,170 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
   <title>Stock App</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 25px;
+    }
+
+    input, button {
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+    }
+
+    input {
+      background: #1e293b;
+      color: white;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .cards {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      margin-bottom: 25px;
+    }
+
+    .card {
+      background: #1e293b;
+      padding: 18px;
+      border-radius: 14px;
+      min-width: 180px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    }
+
+    .label {
+      color: #94a3b8;
+      font-size: 13px;
+    }
+
+    .value {
+      font-size: 24px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+
+    .positive {
+      color: #22c55e;
+    }
+
+    .negative {
+      color: #ef4444;
+    }
+
+    .chart-box {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 16px;
+      height: 480px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      margin-bottom: 30px;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .news {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 16px;
+    }
+
+    .news li {
+      margin-bottom: 12px;
+    }
+
+    .news a {
+      color: #93c5fd;
+      text-decoration: none;
+    }
+
+    .news a:hover {
+      text-decoration: underline;
+    }
+  </style>
 </head>
+
 <body>
+  <div class="container">
+    <h1>Stock Dashboard</h1>
 
-<h1>Stock App</h1>
+    <div class="controls">
+      <input id="ticker" value="AAPL" placeholder="Ticker">
+      <input id="start" type="date">
+      <input id="end" type="date">
+      <button onclick="load()">Load</button>
+    </div>
 
-<input id="ticker" value="AAPL">
-<input id="start" type="date">
-<input id="end" type="date">
-<button onclick="load()">Carica</button>
+    <div class="cards">
+      <div class="card">
+        <div class="label">Ticker</div>
+        <div class="value" id="tickerCard">-</div>
+      </div>
 
-<h2 id="info"></h2>
+      <div class="card">
+        <div class="label">Last Price</div>
+        <div class="value" id="priceCard">-</div>
+      </div>
 
-<canvas id="chart"></canvas>
+      <div class="card">
+        <div class="label">Daily Change</div>
+        <div class="value" id="changeCard">-</div>
+      </div>
+    </div>
 
-<h3>News</h3>
-<ul id="news"></ul>
+    <div class="chart-box">
+      <canvas id="chart"></canvas>
+    </div>
+
+    <div class="news">
+      <h3>Latest News</h3>
+      <ul id="news"></ul>
+    </div>
+  </div>
 
 <script>
 let chart;
 
 async function load() {
-  const t = document.getElementById("ticker").value;
+  const t = document.getElementById("ticker").value.trim();
   const s = document.getElementById("start").value;
   const e = document.getElementById("end").value;
 
@@ -40,19 +180,88 @@ async function load() {
     return;
   }
 
-  document.getElementById("info").innerText =
-    `${data.ticker} | Prezzo: ${data.price} | Δ ${data.change} (${data.change_pct}%)`;
+  const changeEl = document.getElementById("changeCard");
+
+  document.getElementById("tickerCard").innerText = data.ticker;
+  document.getElementById("priceCard").innerText = `$${data.price}`;
+  changeEl.innerText = `${data.change} (${data.change_pct}%)`;
+
+  changeEl.className = "value " + (data.change >= 0 ? "positive" : "negative");
 
   const labels = data.prices.map(p => p.date);
   const prices = data.prices.map(p => p.close);
 
+  const ctx = document.getElementById("chart").getContext("2d");
+
+  const gradient = ctx.createLinearGradient(0, 0, 0, 450);
+  gradient.addColorStop(0, "rgba(37, 99, 235, 0.35)");
+  gradient.addColorStop(1, "rgba(37, 99, 235, 0)");
+
   if (chart) chart.destroy();
 
-  chart = new Chart(document.getElementById("chart"), {
+  chart = new Chart(ctx, {
     type: "line",
     data: {
       labels: labels,
-      datasets: [{ label: "Price", data: prices }]
+      datasets: [{
+        label: `${data.ticker} Close Price`,
+        data: prices,
+        borderColor: "#3b82f6",
+        backgroundColor: gradient,
+        borderWidth: 2,
+        fill: true,
+        tension: 0.25,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHoverBackgroundColor: "#ffffff"
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          labels: {
+            color: "#e5e7eb"
+          }
+        },
+        tooltip: {
+          backgroundColor: "#020617",
+          titleColor: "#ffffff",
+          bodyColor: "#e5e7eb",
+          borderColor: "#334155",
+          borderWidth: 1,
+          callbacks: {
+            label: function(context) {
+              return `Close: $${context.raw.toFixed(2)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: "#94a3b8",
+            maxTicksLimit: 10
+          },
+          grid: {
+            color: "rgba(148, 163, 184, 0.1)"
+          }
+        },
+        y: {
+          ticks: {
+            color: "#94a3b8",
+            callback: value => "$" + value
+          },
+          grid: {
+            color: "rgba(148, 163, 184, 0.1)"
+          }
+        }
+      }
     }
   });
 
