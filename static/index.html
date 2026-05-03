@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <title>Stock App</title>
 
-  <!-- Lightweight Charts -->
   <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
 
   <style>
@@ -90,7 +89,7 @@
     }
 
     .chart-box {
-      background: #1e293b;
+      background: #ffffff;
       padding: 20px;
       border-radius: 16px;
       height: 520px;
@@ -196,18 +195,18 @@ async function load() {
     width: chartContainer.clientWidth,
     height: chartContainer.clientHeight,
     layout: {
-      background: { color: "#1e293b" },
-      textColor: "#e5e7eb"
+      background: { color: "#ffffff" },
+      textColor: "#111827"
     },
     grid: {
-      vertLines: { color: "rgba(148,163,184,0.12)" },
-      horzLines: { color: "rgba(148,163,184,0.12)" }
+      vertLines: { color: "rgba(17,24,39,0.08)" },
+      horzLines: { color: "rgba(17,24,39,0.08)" }
     },
     rightPriceScale: {
-      borderColor: "rgba(148,163,184,0.25)"
+      borderColor: "rgba(17,24,39,0.2)"
     },
     timeScale: {
-      borderColor: "rgba(148,163,184,0.25)"
+      borderColor: "rgba(17,24,39,0.2)"
     }
   });
 
@@ -231,8 +230,10 @@ async function load() {
   );
 
   const ma20 = chart.addLineSeries({
-    color: "#60a5fa",
-    lineWidth: 2
+    color: "#2563eb",
+    lineWidth: 2,
+    priceLineVisible: false,
+    lastValueVisible: false
   });
 
   ma20.setData(
@@ -242,8 +243,10 @@ async function load() {
   );
 
   const bbUpper = chart.addLineSeries({
-    color: "#a78bfa",
-    lineWidth: 1
+    color: "#7c3aed",
+    lineWidth: 1,
+    priceLineVisible: false,
+    lastValueVisible: false
   });
 
   bbUpper.setData(
@@ -253,8 +256,10 @@ async function load() {
   );
 
   const bbLower = chart.addLineSeries({
-    color: "#a78bfa",
-    lineWidth: 1
+    color: "#7c3aed",
+    lineWidth: 1,
+    priceLineVisible: false,
+    lastValueVisible: false
   });
 
   bbLower.setData(
@@ -284,9 +289,6 @@ async function load() {
 
 load();
 </script>
-
-</body>
-</html>
 
 </body>
 </html>
