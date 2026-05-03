@@ -94,19 +94,6 @@
       justify-content: flex-end;
     }
 
-    .chart-toggle label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      color: #e5e7eb;
-      font-size: 14px;
-      font-weight: 500;
-    }
-
-    .chart-toggle input {
-      padding: 0;
-    }
-
     .chart-box {
       background: #ffffff;
       padding: 20px;
@@ -134,10 +121,6 @@
     .news a {
       color: #93c5fd;
       text-decoration: none;
-    }
-
-    .news a:hover {
-      text-decoration: underline;
     }
   </style>
 </head>
@@ -171,7 +154,7 @@
     </div>
 
     <div class="chart-toggle">
-      <label>
+      <label style="display:flex;align-items:center;gap:6px;">
         <input type="checkbox" id="toggleBB">
         Bollinger Bands
       </label>
@@ -191,6 +174,18 @@
 let chart;
 let bbUpperSeries = null;
 let bbLowerSeries = null;
+
+function setDefaultDates() {
+  const today = new Date();
+  const endDate = today.toISOString().split("T")[0];
+
+  const start = new Date();
+  start.setFullYear(start.getFullYear() - 2);
+  const startDate = start.toISOString().split("T")[0];
+
+  document.getElementById("start").value = startDate;
+  document.getElementById("end").value = endDate;
+}
 
 async function load() {
   const t = document.getElementById("ticker").value.trim();
@@ -225,28 +220,10 @@ async function load() {
     layout: {
       background: { color: "#ffffff" },
       textColor: "#111827"
-    },
-    grid: {
-      vertLines: { color: "rgba(17,24,39,0.08)" },
-      horzLines: { color: "rgba(17,24,39,0.08)" }
-    },
-    rightPriceScale: {
-      borderColor: "rgba(17,24,39,0.2)"
-    },
-    timeScale: {
-      borderColor: "rgba(17,24,39,0.2)"
     }
   });
 
-  const candleSeries = chart.addCandlestickSeries({
-    upColor: "#22c55e",
-    downColor: "#ef4444",
-    borderUpColor: "#22c55e",
-    borderDownColor: "#ef4444",
-    wickUpColor: "#22c55e",
-    wickDownColor: "#ef4444"
-  });
-
+  const candleSeries = chart.addCandlestickSeries();
   candleSeries.setData(
     data.prices.map(p => ({
       time: p.date,
@@ -258,7 +235,7 @@ async function load() {
   );
 
   const ma20 = chart.addLineSeries({
-    color: "#2563eb",
+    color: "rgba(37, 99, 235, 0.7)",
     lineWidth: 1,
     priceLineVisible: false,
     lastValueVisible: false
@@ -273,8 +250,6 @@ async function load() {
   bbUpperSeries = chart.addLineSeries({
     color: "#7c3aed",
     lineWidth: 1,
-    priceLineVisible: false,
-    lastValueVisible: false,
     visible: false
   });
 
@@ -287,8 +262,6 @@ async function load() {
   bbLowerSeries = chart.addLineSeries({
     color: "#7c3aed",
     lineWidth: 1,
-    priceLineVisible: false,
-    lastValueVisible: false,
     visible: false
   });
 
@@ -298,17 +271,18 @@ async function load() {
       .map(p => ({ time: p.date, value: p.bb_lower }))
   );
 
-  const showBB = document.getElementById("toggleBB").checked;
-  bbUpperSeries.applyOptions({ visible: showBB });
-  bbLowerSeries.applyOptions({ visible: showBB });
-
+  // show only last ~7 months initially
   const visibleFromIndex = Math.max(data.prices.length - 150, 0);
   const visibleToIndex = data.prices.length - 1;
 
   chart.timeScale().setVisibleRange({
-  from: data.prices[visibleFromIndex].date,
-  to: data.prices[visibleToIndex].date
+    from: data.prices[visibleFromIndex].date,
+    to: data.prices[visibleToIndex].date
   });
+
+  const showBB = document.getElementById("toggleBB").checked;
+  bbUpperSeries.applyOptions({ visible: showBB });
+  bbLowerSeries.applyOptions({ visible: showBB });
 
   const newsEl = document.getElementById("news");
   newsEl.innerHTML = "";
@@ -340,6 +314,7 @@ window.addEventListener("resize", () => {
   }
 });
 
+setDefaultDates();
 load();
 </script>
 
