@@ -20,18 +20,22 @@
       padding: 20px;
     }
 
+    h1 {
+      margin-bottom: 20px;
+    }
+
     .controls {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
       margin-bottom: 25px;
-      align-items: center;
     }
 
     input, button {
-      padding: 10px;
+      padding: 12px;
       border-radius: 8px;
       border: none;
+      font-size: 14px;
     }
 
     input {
@@ -46,11 +50,50 @@
       font-weight: bold;
     }
 
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .cards {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      margin-bottom: 25px;
+    }
+
+    .card {
+      background: #1e293b;
+      padding: 18px;
+      border-radius: 14px;
+      min-width: 180px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    }
+
+    .label {
+      color: #94a3b8;
+      font-size: 13px;
+    }
+
+    .value {
+      font-size: 24px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+
+    .positive {
+      color: #22c55e;
+    }
+
+    .negative {
+      color: #ef4444;
+    }
+
     .chart-box {
       background: #ffffff;
       padding: 20px;
       border-radius: 16px;
       height: 520px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
       margin-bottom: 30px;
     }
 
@@ -59,73 +102,70 @@
       height: 100%;
     }
 
-    .cards {
-      display: flex;
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-
-    .card {
-      background: #1e293b;
-      padding: 15px;
-      border-radius: 12px;
-    }
-
-    .positive { color: #22c55e; }
-    .negative { color: #ef4444; }
-
     .news {
       background: #1e293b;
       padding: 20px;
       border-radius: 16px;
     }
 
+    .news li {
+      margin-bottom: 12px;
+    }
+
     .news a {
       color: #93c5fd;
+      text-decoration: none;
+    }
+
+    .news a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
 
 <body>
-<div class="container">
+  <div class="container">
+    <h1>Stock Dashboard</h1>
 
-  <h2>Stock Dashboard</h2>
+    <div class="controls">
+      <input id="ticker" value="AAPL" placeholder="Ticker">
+      <input id="start" type="date">
+      <input id="end" type="date">
+      <button onclick="load()">Load</button>
+    </div>
 
-  <div class="controls">
-    <input id="ticker" value="AAPL">
-    <input id="start" type="date">
-    <input id="end" type="date">
+    <div class="cards">
+      <div class="card">
+        <div class="label">Ticker</div>
+        <div class="value" id="tickerCard">-</div>
+      </div>
 
-    <label style="display:flex;align-items:center;gap:6px;">
-      <input type="checkbox" id="showBollinger" onchange="load()">
-      Bollinger Bands
-    </label>
+      <div class="card">
+        <div class="label">Last Price</div>
+        <div class="value" id="priceCard">-</div>
+      </div>
 
-    <button onclick="load()">Load</button>
+      <div class="card">
+        <div class="label">Daily Change</div>
+        <div class="value" id="changeCard">-</div>
+      </div>
+    </div>
+
+    <div class="chart-box">
+      <div id="chart"></div>
+    </div>
+
+    <div class="news">
+      <h3>Latest News</h3>
+      <ul id="news"></ul>
+    </div>
   </div>
-
-  <div class="cards">
-    <div class="card">Ticker: <span id="tickerCard"></span></div>
-    <div class="card">Price: <span id="priceCard"></span></div>
-    <div class="card">Change: <span id="changeCard"></span></div>
-  </div>
-
-  <div class="chart-box">
-    <div id="chart"></div>
-  </div>
-
-  <div class="news">
-    <h3>News</h3>
-    <ul id="news"></ul>
-  </div>
-
-</div>
 
 <script>
 let chart;
 
 async function load() {
-  const t = document.getElementById("ticker").value;
+  const t = document.getElementById("ticker").value.trim();
   const s = document.getElementById("start").value;
   const e = document.getElementById("end").value;
 
@@ -141,12 +181,12 @@ async function load() {
     return;
   }
 
-  document.getElementById("tickerCard").innerText = data.ticker;
-  document.getElementById("priceCard").innerText = data.price;
-
   const changeEl = document.getElementById("changeCard");
+
+  document.getElementById("tickerCard").innerText = data.ticker;
+  document.getElementById("priceCard").innerText = `$${data.price}`;
   changeEl.innerText = `${data.change} (${data.change_pct}%)`;
-  changeEl.className = data.change >= 0 ? "positive" : "negative";
+  changeEl.className = "value " + (data.change >= 0 ? "positive" : "negative");
 
   const chartContainer = document.getElementById("chart");
   chartContainer.innerHTML = "";
@@ -157,10 +197,28 @@ async function load() {
     layout: {
       background: { color: "#ffffff" },
       textColor: "#111827"
+    },
+    grid: {
+      vertLines: { color: "rgba(17,24,39,0.08)" },
+      horzLines: { color: "rgba(17,24,39,0.08)" }
+    },
+    rightPriceScale: {
+      borderColor: "rgba(17,24,39,0.2)"
+    },
+    timeScale: {
+      borderColor: "rgba(17,24,39,0.2)"
     }
   });
 
-  const candleSeries = chart.addCandlestickSeries();
+  const candleSeries = chart.addCandlestickSeries({
+    upColor: "#22c55e",
+    downColor: "#ef4444",
+    borderUpColor: "#22c55e",
+    borderDownColor: "#ef4444",
+    wickUpColor: "#22c55e",
+    wickDownColor: "#ef4444"
+  });
+
   candleSeries.setData(
     data.prices.map(p => ({
       time: p.date,
@@ -171,7 +229,6 @@ async function load() {
     }))
   );
 
-  // MA20 (always visible)
   const ma20 = chart.addLineSeries({
     color: "#2563eb",
     lineWidth: 2,
@@ -185,38 +242,40 @@ async function load() {
       .map(p => ({ time: p.date, value: p.ma20 }))
   );
 
-  // Optional Bollinger
-  const showBollinger = document.getElementById("showBollinger").checked;
+  const bbUpper = chart.addLineSeries({
+    color: "#7c3aed",
+    lineWidth: 1,
+    priceLineVisible: false,
+    lastValueVisible: false
+  });
 
-  if (showBollinger) {
-    const bbUpper = chart.addLineSeries({
-      color: "#7c3aed",
-      lineWidth: 1,
-      priceLineVisible: false,
-      lastValueVisible: false
-    });
+  bbUpper.setData(
+    data.prices
+      .filter(p => p.bb_upper !== null)
+      .map(p => ({ time: p.date, value: p.bb_upper }))
+  );
 
-    bbUpper.setData(
-      data.prices
-        .filter(p => p.bb_upper !== null)
-        .map(p => ({ time: p.date, value: p.bb_upper }))
-    );
+  const bbLower = chart.addLineSeries({
+    color: "#7c3aed",
+    lineWidth: 1,
+    priceLineVisible: false,
+    lastValueVisible: false
+  });
 
-    const bbLower = chart.addLineSeries({
-      color: "#7c3aed",
-      lineWidth: 1,
-      priceLineVisible: false,
-      lastValueVisible: false
-    });
-
-    bbLower.setData(
-      data.prices
-        .filter(p => p.bb_lower !== null)
-        .map(p => ({ time: p.date, value: p.bb_lower }))
-    );
-  }
+  bbLower.setData(
+    data.prices
+      .filter(p => p.bb_lower !== null)
+      .map(p => ({ time: p.date, value: p.bb_lower }))
+  );
 
   chart.timeScale().fitContent();
+
+  window.addEventListener("resize", () => {
+    chart.applyOptions({
+      width: chartContainer.clientWidth,
+      height: chartContainer.clientHeight
+    });
+  });
 
   const newsEl = document.getElementById("news");
   newsEl.innerHTML = "";
