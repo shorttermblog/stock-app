@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 import yfinance as yf
 import feedparser
 from urllib.parse import quote
+import pandas as pd
 
 app = FastAPI()
 
@@ -16,15 +17,13 @@ def home():
     return FileResponse("static/index.html")
 
 
-# 🔹 funzione per Google News RSS
 def get_google_news(ticker: str, company_name: str = "", max_news: int = 10):
-    query = f'"{ticker}" "{company_name}" stock OR earnings when:1d'
+    query = f'"{ticker}" "{company_name}" stock OR earnings OR shares OR revenue when:7d'
     encoded_query = quote(query)
 
     url = (
-        f"https://news.google.com/rss/search?"
-        f"q={encoded_query}"
-        f"&hl=en-US&gl=US&ceid=US:en"
+        "https://news.google.com/rss/search?"
+        f"q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
     )
 
     feed = feedparser.parse(url)
@@ -56,28 +55,37 @@ def get_stock(ticker: str, start: str = None, end: str = None):
 
         data = data.reset_index()
 
+        data["MA20"] = data["Close"].rolling(window=20).mean()
+        data["STD20"] = data["Close"].rolling(window=20).std()
+        data["BB_UPPER"] = data["MA20"] + (2 * data["STD20"])
+        data["BB_LOWER"] = data["MA20"] - (2 * data["STD20"])
+
         last = float(data["Close"].iloc[-1])
         prev = float(data["Close"].iloc[-2])
 
         change = last - prev
         change_pct = (change / prev) * 100
 
-        prices = [
-            {
-                "date": str(row["Date"])[:10],
-                "close": float(row["Close"])
-            }
-            for _, row in data.iterrows()
-        ]
+        prices = []
 
-        # 🔹 nome azienda (per migliorare news)
+        for _, row in data.iterrows():
+            prices.append({
+                "date": str(row["Date"])[:10],
+                "open": round(float(row["Open"]), 2),
+                "high": round(float(row["High"]), 2),
+                "low": round(float(row["Low"]), 2),
+                "close": round(float(row["Close"]), 2),
+                "ma20": None if pd.isna(row["MA20"]) else round(float(row["MA20"]), 2),
+                "bb_upper": None if pd.isna(row["BB_UPPER"]) else round(float(row["BB_UPPER"]), 2),
+                "bb_lower": None if pd.isna(row["BB_LOWER"]) else round(float(row["BB_LOWER"]), 2),
+            })
+
         try:
             company_name = stock.info.get("shortName", "")
         except:
             company_name = ""
 
-        # 🔹 news da Google
-        news_list = get_google_news(ticker.upper(), company_name)
+        news_list = get_google_news(ticker.upper(), company_name, max_news=10)
 
         return {
             "ticker": ticker.upper(),
