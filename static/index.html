@@ -302,7 +302,13 @@ async function load() {
   bbUpperSeries.applyOptions({ visible: showBB });
   bbLowerSeries.applyOptions({ visible: showBB });
 
-  chart.timeScale().fitContent();
+  const visibleFromIndex = Math.max(data.prices.length - 150, 0);
+  const visibleToIndex = data.prices.length - 1;
+
+  chart.timeScale().setVisibleRange({
+  from: data.prices[visibleFromIndex].date,
+  to: data.prices[visibleToIndex].date
+  });
 
   const newsEl = document.getElementById("news");
   newsEl.innerHTML = "";
