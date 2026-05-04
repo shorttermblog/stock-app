@@ -2,11 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <title>Stock App</title>
 
   <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
 
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: Arial, sans-serif;
@@ -22,20 +28,23 @@
 
     h1 {
       margin-bottom: 20px;
+      font-size: 32px;
     }
 
     .controls {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 120px;
       gap: 10px;
-      flex-wrap: wrap;
       margin-bottom: 25px;
     }
 
-    input, button {
-      padding: 12px;
+    input,
+    button {
+      width: 100%;
+      padding: 13px 14px;
       border-radius: 8px;
       border: none;
-      font-size: 14px;
+      font-size: 15px;
     }
 
     input {
@@ -55,9 +64,9 @@
     }
 
     .cards {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
       gap: 15px;
-      flex-wrap: wrap;
       margin-bottom: 25px;
     }
 
@@ -65,8 +74,7 @@
       background: #1e293b;
       padding: 18px;
       border-radius: 14px;
-      min-width: 180px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
     }
 
     .label {
@@ -78,6 +86,7 @@
       font-size: 24px;
       font-weight: bold;
       margin-top: 8px;
+      word-break: break-word;
     }
 
     .positive {
@@ -94,13 +103,25 @@
       justify-content: flex-end;
     }
 
+    .chart-toggle label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+    }
+
+    .chart-toggle input {
+      width: auto;
+    }
+
     .chart-box {
       background: #ffffff;
-      padding: 20px;
+      padding: 12px;
       border-radius: 16px;
       height: 520px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
       margin-bottom: 30px;
+      overflow: hidden;
     }
 
     #chart {
@@ -114,13 +135,95 @@
       border-radius: 16px;
     }
 
+    .news h3 {
+      margin-top: 0;
+    }
+
+    .news ul {
+      padding-left: 20px;
+    }
+
     .news li {
       margin-bottom: 12px;
+      line-height: 1.4;
     }
 
     .news a {
       color: #93c5fd;
       text-decoration: none;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        margin: 0;
+        padding: 16px;
+      }
+
+      h1 {
+        font-size: 26px;
+        margin-bottom: 18px;
+      }
+
+      .controls {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      input,
+      button {
+        font-size: 16px;
+        padding: 14px;
+      }
+
+      .cards {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .card {
+        padding: 16px;
+      }
+
+      .value {
+        font-size: 22px;
+      }
+
+      .chart-toggle {
+        justify-content: flex-start;
+        margin-bottom: 12px;
+      }
+
+      .chart-box {
+        height: 380px;
+        padding: 8px;
+        border-radius: 14px;
+      }
+
+      .news {
+        padding: 16px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 12px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      .chart-box {
+        height: 340px;
+      }
+
+      .value {
+        font-size: 20px;
+      }
+
+      .news ul {
+        padding-left: 18px;
+      }
     }
   </style>
 </head>
@@ -154,7 +257,7 @@
     </div>
 
     <div class="chart-toggle">
-      <label style="display:flex;align-items:center;gap:6px;">
+      <label>
         <input type="checkbox" id="toggleBB">
         Bollinger Bands
       </label>
@@ -170,153 +273,182 @@
     </div>
   </div>
 
-<script>
-let chart;
-let bbUpperSeries = null;
-let bbLowerSeries = null;
+  <script>
+    let chart;
+    let bbUpperSeries = null;
+    let bbLowerSeries = null;
 
-function setDefaultDates() {
-  const today = new Date();
-  const endDate = today.toISOString().split("T")[0];
+    function setDefaultDates() {
+      const today = new Date();
+      const endDate = today.toISOString().split("T")[0];
 
-  const start = new Date();
-  start.setFullYear(start.getFullYear() - 2);
-  const startDate = start.toISOString().split("T")[0];
+      const start = new Date();
+      start.setFullYear(start.getFullYear() - 2);
+      const startDate = start.toISOString().split("T")[0];
 
-  document.getElementById("start").value = startDate;
-  document.getElementById("end").value = endDate;
-}
-
-async function load() {
-  const t = document.getElementById("ticker").value.trim();
-  const s = document.getElementById("start").value;
-  const e = document.getElementById("end").value;
-
-  let url = `/api/stock?ticker=${t}`;
-  if (s) url += `&start=${s}`;
-  if (e) url += `&end=${e}`;
-
-  const res = await fetch(url);
-  const data = await res.json();
-
-  if (data.error) {
-    alert(data.error);
-    return;
-  }
-
-  const changeEl = document.getElementById("changeCard");
-
-  document.getElementById("tickerCard").innerText = data.ticker;
-  document.getElementById("priceCard").innerText = `$${data.price}`;
-  changeEl.innerText = `${data.change} (${data.change_pct}%)`;
-  changeEl.className = "value " + (data.change >= 0 ? "positive" : "negative");
-
-  const chartContainer = document.getElementById("chart");
-  chartContainer.innerHTML = "";
-
-  chart = LightweightCharts.createChart(chartContainer, {
-    width: chartContainer.clientWidth,
-    height: chartContainer.clientHeight,
-    layout: {
-      background: { color: "#ffffff" },
-      textColor: "#111827"
+      document.getElementById("start").value = startDate;
+      document.getElementById("end").value = endDate;
     }
-  });
 
-  const candleSeries = chart.addCandlestickSeries();
-  candleSeries.setData(
-    data.prices.map(p => ({
-      time: p.date,
-      open: p.open,
-      high: p.high,
-      low: p.low,
-      close: p.close
-    }))
-  );
+    async function load() {
+      const t = document.getElementById("ticker").value.trim().toUpperCase();
+      const s = document.getElementById("start").value;
+      const e = document.getElementById("end").value;
 
-  const ma20 = chart.addLineSeries({
-    color: "rgba(37, 99, 235, 0.7)",
-    lineWidth: 1,
-    priceLineVisible: false,
-    lastValueVisible: false
-  });
+      let url = `/api/stock?ticker=${encodeURIComponent(t)}`;
+      if (s) url += `&start=${encodeURIComponent(s)}`;
+      if (e) url += `&end=${encodeURIComponent(e)}`;
 
-  ma20.setData(
-    data.prices
-      .filter(p => p.ma20 !== null)
-      .map(p => ({ time: p.date, value: p.ma20 }))
-  );
+      const res = await fetch(url);
+      const data = await res.json();
 
-  bbUpperSeries = chart.addLineSeries({
-    color: "#7c3aed",
-    lineWidth: 1,
-    visible: false
-  });
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
 
-  bbUpperSeries.setData(
-    data.prices
-      .filter(p => p.bb_upper !== null)
-      .map(p => ({ time: p.date, value: p.bb_upper }))
-  );
+      const changeEl = document.getElementById("changeCard");
 
-  bbLowerSeries = chart.addLineSeries({
-    color: "#7c3aed",
-    lineWidth: 1,
-    visible: false
-  });
+      document.getElementById("tickerCard").innerText = data.ticker;
+      document.getElementById("priceCard").innerText = `$${data.price}`;
+      changeEl.innerText = `${data.change} (${data.change_pct}%)`;
+      changeEl.className = "value " + (data.change >= 0 ? "positive" : "negative");
 
-  bbLowerSeries.setData(
-    data.prices
-      .filter(p => p.bb_lower !== null)
-      .map(p => ({ time: p.date, value: p.bb_lower }))
-  );
+      const chartContainer = document.getElementById("chart");
+      chartContainer.innerHTML = "";
 
-  // show only last ~7 months initially
-  const visibleFromIndex = Math.max(data.prices.length - 150, 0);
-  const visibleToIndex = data.prices.length - 1;
+      chart = LightweightCharts.createChart(chartContainer, {
+        width: chartContainer.clientWidth,
+        height: chartContainer.clientHeight,
+        layout: {
+          background: { color: "#ffffff" },
+          textColor: "#111827"
+        },
+        grid: {
+          vertLines: {
+            color: "#e5e7eb"
+          },
+          horzLines: {
+            color: "#e5e7eb"
+          }
+        },
+        rightPriceScale: {
+          borderColor: "#d1d5db"
+        },
+        timeScale: {
+          borderColor: "#d1d5db"
+        }
+      });
 
-  chart.timeScale().setVisibleRange({
-    from: data.prices[visibleFromIndex].date,
-    to: data.prices[visibleToIndex].date
-  });
+      const candleSeries = chart.addCandlestickSeries();
 
-  const showBB = document.getElementById("toggleBB").checked;
-  bbUpperSeries.applyOptions({ visible: showBB });
-  bbLowerSeries.applyOptions({ visible: showBB });
+      candleSeries.setData(
+        data.prices.map(p => ({
+          time: p.date,
+          open: p.open,
+          high: p.high,
+          low: p.low,
+          close: p.close
+        }))
+      );
 
-  const newsEl = document.getElementById("news");
-  newsEl.innerHTML = "";
+      const ma20 = chart.addLineSeries({
+        color: "rgba(37, 99, 235, 0.7)",
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false
+      });
 
-  data.news.forEach(n => {
-    const li = document.createElement("li");
-    li.innerHTML = `<a href="${n.link}" target="_blank">${n.title}</a>`;
-    newsEl.appendChild(li);
-  });
-}
+      ma20.setData(
+        data.prices
+          .filter(p => p.ma20 !== null)
+          .map(p => ({ time: p.date, value: p.ma20 }))
+      );
 
-document.getElementById("toggleBB").addEventListener("change", function () {
-  const show = this.checked;
+      bbUpperSeries = chart.addLineSeries({
+        color: "#7c3aed",
+        lineWidth: 1,
+        visible: false,
+        priceLineVisible: false,
+        lastValueVisible: false
+      });
 
-  if (bbUpperSeries && bbLowerSeries) {
-    bbUpperSeries.applyOptions({ visible: show });
-    bbLowerSeries.applyOptions({ visible: show });
-  }
-});
+      bbUpperSeries.setData(
+        data.prices
+          .filter(p => p.bb_upper !== null)
+          .map(p => ({ time: p.date, value: p.bb_upper }))
+      );
 
-window.addEventListener("resize", () => {
-  const chartContainer = document.getElementById("chart");
+      bbLowerSeries = chart.addLineSeries({
+        color: "#7c3aed",
+        lineWidth: 1,
+        visible: false,
+        priceLineVisible: false,
+        lastValueVisible: false
+      });
 
-  if (chart) {
-    chart.applyOptions({
-      width: chartContainer.clientWidth,
-      height: chartContainer.clientHeight
+      bbLowerSeries.setData(
+        data.prices
+          .filter(p => p.bb_lower !== null)
+          .map(p => ({ time: p.date, value: p.bb_lower }))
+      );
+
+      if (data.prices.length > 0) {
+        const visibleFromIndex = Math.max(data.prices.length - 150, 0);
+        const visibleToIndex = data.prices.length - 1;
+
+        if (data.prices.length > 150) {
+          chart.timeScale().setVisibleRange({
+            from: data.prices[visibleFromIndex].date,
+            to: data.prices[visibleToIndex].date
+          });
+        } else {
+          chart.timeScale().fitContent();
+        }
+      }
+
+      const showBB = document.getElementById("toggleBB").checked;
+
+      bbUpperSeries.applyOptions({ visible: showBB });
+      bbLowerSeries.applyOptions({ visible: showBB });
+
+      const newsEl = document.getElementById("news");
+      newsEl.innerHTML = "";
+
+      data.news.forEach(n => {
+        const li = document.createElement("li");
+        li.innerHTML = `<a href="${n.link}" target="_blank" rel="noopener noreferrer">${n.title}</a>`;
+        newsEl.appendChild(li);
+      });
+
+      chart.applyOptions({
+        width: chartContainer.clientWidth,
+        height: chartContainer.clientHeight
+      });
+    }
+
+    document.getElementById("toggleBB").addEventListener("change", function () {
+      const show = this.checked;
+
+      if (bbUpperSeries && bbLowerSeries) {
+        bbUpperSeries.applyOptions({ visible: show });
+        bbLowerSeries.applyOptions({ visible: show });
+      }
     });
-  }
-});
 
-setDefaultDates();
-load();
-</script>
+    window.addEventListener("resize", () => {
+      const chartContainer = document.getElementById("chart");
 
+      if (chart) {
+        chart.applyOptions({
+          width: chartContainer.clientWidth,
+          height: chartContainer.clientHeight
+        });
+      }
+    });
+
+    setDefaultDates();
+    load();
+  </script>
 </body>
 </html>
