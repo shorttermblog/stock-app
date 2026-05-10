@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>Stock App</title>
+  <title>Asset App</title>
 
   <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
 
@@ -89,6 +89,13 @@
       word-break: break-word;
     }
 
+    .subvalue {
+      margin-top: 6px;
+      font-size: 13px;
+      color: #94a3b8;
+      word-break: break-word;
+    }
+
     .positive {
       color: #22c55e;
     }
@@ -122,11 +129,13 @@
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
       margin-bottom: 30px;
       overflow: hidden;
+      touch-action: pan-y;
     }
 
     #chart {
       width: 100%;
       height: 100%;
+      touch-action: pan-y;
     }
 
     .news {
@@ -194,13 +203,19 @@
       }
 
       .chart-box {
-        height: 380px;
+        height: 360px;
         padding: 8px;
         border-radius: 14px;
       }
 
       .news {
         padding: 16px;
+      }
+    }
+
+    @media (max-width: 768px) and (orientation: landscape) {
+      .chart-box {
+        height: 240px;
       }
     }
 
@@ -214,7 +229,7 @@
       }
 
       .chart-box {
-        height: 340px;
+        height: 320px;
       }
 
       .value {
@@ -230,19 +245,20 @@
 
 <body>
   <div class="container">
-    <h1>Stock Dashboard</h1>
+    <h1>Asset Dashboard</h1>
 
-    <div class="controls">
-      <input id="ticker" value="AAPL" placeholder="Ticker">
+    <form class="controls" id="assetForm">
+      <input id="ticker" value="Apple" placeholder="Asset">
       <input id="start" type="date">
       <input id="end" type="date">
-      <button onclick="load()">Load</button>
-    </div>
+      <button type="submit">Load</button>
+    </form>
 
     <div class="cards">
       <div class="card">
-        <div class="label">Ticker</div>
+        <div class="label">Asset</div>
         <div class="value" id="tickerCard">-</div>
+        <div class="subvalue" id="symbolCard"></div>
       </div>
 
       <div class="card">
@@ -290,10 +306,26 @@
       document.getElementById("end").value = endDate;
     }
 
+    function formatNumber(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) {
+        return "-";
+      }
+
+      return Number(value).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
     async function load() {
-      const t = document.getElementById("ticker").value.trim().toUpperCase();
+      const t = document.getElementById("ticker").value.trim();
       const s = document.getElementById("start").value;
       const e = document.getElementById("end").value;
+
+      if (!t) {
+        alert("Insert an asset, for example Apple, Tesla, QQQ, gold futures or euro dollar.");
+        return;
+      }
 
       let url = `/api/stock?ticker=${encodeURIComponent(t)}`;
       if (s) url += `&start=${encodeURIComponent(s)}`;
@@ -309,9 +341,19 @@
 
       const changeEl = document.getElementById("changeCard");
 
-      document.getElementById("tickerCard").innerText = data.ticker;
-      document.getElementById("priceCard").innerText = `$${data.price}`;
-      changeEl.innerText = `${data.change} (${data.change_pct}%)`;
+      const assetDisplayName =
+        data.asset_name ||
+        data.company_name ||
+        data.ticker ||
+        data.query ||
+        "-";
+
+      document.getElementById("tickerCard").innerText = assetDisplayName;
+      document.getElementById("symbolCard").innerText = data.ticker ? data.ticker : "";
+
+      document.getElementById("priceCard").innerText = formatNumber(data.price);
+
+      changeEl.innerText = `${formatNumber(data.change)} (${formatNumber(data.change_pct)}%)`;
       changeEl.className = "value " + (data.change >= 0 ? "positive" : "negative");
 
       const chartContainer = document.getElementById("chart");
@@ -320,10 +362,14 @@
       chart = LightweightCharts.createChart(chartContainer, {
         width: chartContainer.clientWidth,
         height: chartContainer.clientHeight,
+
         layout: {
-          background: { color: "#ffffff" },
+          background: {
+            color: "#ffffff"
+          },
           textColor: "#111827"
         },
+
         grid: {
           vertLines: {
             color: "#e5e7eb"
@@ -332,11 +378,27 @@
             color: "#e5e7eb"
           }
         },
+
         rightPriceScale: {
+          autoScale: true,
           borderColor: "#d1d5db"
         },
+
         timeScale: {
           borderColor: "#d1d5db"
+        },
+
+        handleScroll: {
+          mouseWheel: true,
+          pressedMouseMove: true,
+          horzTouchDrag: true,
+          vertTouchDrag: false
+        },
+
+        handleScale: {
+          axisPressedMouseMove: false,
+          mouseWheel: false,
+          pinch: true
         }
       });
 
@@ -393,6 +455,10 @@
           .map(p => ({ time: p.date, value: p.bb_lower }))
       );
 
+      candleSeries.priceScale().applyOptions({
+        autoScale: true
+      });
+
       if (data.prices.length > 0) {
         const visibleFromIndex = Math.max(data.prices.length - 150, 0);
         const visibleToIndex = data.prices.length - 1;
@@ -409,17 +475,28 @@
 
       const showBB = document.getElementById("toggleBB").checked;
 
-      bbUpperSeries.applyOptions({ visible: showBB });
-      bbLowerSeries.applyOptions({ visible: showBB });
+      bbUpperSeries.applyOptions({
+        visible: showBB
+      });
+
+      bbLowerSeries.applyOptions({
+        visible: showBB
+      });
 
       const newsEl = document.getElementById("news");
       newsEl.innerHTML = "";
 
-      data.news.forEach(n => {
+      if (!data.news || data.news.length === 0) {
         const li = document.createElement("li");
-        li.innerHTML = `<a href="${n.link}" target="_blank" rel="noopener noreferrer">${n.title}</a>`;
+        li.innerText = "No recent news found.";
         newsEl.appendChild(li);
-      });
+      } else {
+        data.news.forEach(n => {
+          const li = document.createElement("li");
+          li.innerHTML = `<a href="${n.link}" target="_blank" rel="noopener noreferrer">${n.title}</a>`;
+          newsEl.appendChild(li);
+        });
+      }
 
       chart.applyOptions({
         width: chartContainer.clientWidth,
@@ -427,12 +504,22 @@
       });
     }
 
+    document.getElementById("assetForm").addEventListener("submit", function (event) {
+      event.preventDefault();
+      load();
+    });
+
     document.getElementById("toggleBB").addEventListener("change", function () {
       const show = this.checked;
 
       if (bbUpperSeries && bbLowerSeries) {
-        bbUpperSeries.applyOptions({ visible: show });
-        bbLowerSeries.applyOptions({ visible: show });
+        bbUpperSeries.applyOptions({
+          visible: show
+        });
+
+        bbLowerSeries.applyOptions({
+          visible: show
+        });
       }
     });
 
