@@ -1,12 +1,15 @@
 from datetime import date, timedelta
+
+import feedparser
+import pandas as pd
+import requests
+import yfinance as yf
+
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-import yfinance as yf
-import feedparser
 from urllib.parse import quote
-import pandas as pd
-import requests
+
 
 app = FastAPI()
 
@@ -50,7 +53,7 @@ def resolve_stock_symbol(query: str):
     }
 
     headers = {
-        "User-Agent": "Mozilla/5.0"
+        "User-Agent": "Mozilla/5.0",
     }
 
     try:
@@ -58,7 +61,7 @@ def resolve_stock_symbol(query: str):
             url,
             params=params,
             headers=headers,
-            timeout=10
+            timeout=10,
         )
 
         response.raise_for_status()
@@ -87,7 +90,6 @@ def resolve_stock_symbol(query: str):
     except requests.exceptions.RequestException:
         pass
 
-    # Fallback: assume the user typed a valid ticker/symbol
     return {
         "symbol": query.upper(),
         "company_name": "",
@@ -99,7 +101,7 @@ def get_google_news(
     symbol: str,
     company_name: str = "",
     quote_type: str = "",
-    max_news: int = 10
+    max_news: int = 10,
 ):
     """
     Builds a better news query depending on the instrument type.
@@ -130,12 +132,14 @@ def get_google_news(
     news_list = []
 
     for entry in feed.entries[:max_news]:
-        news_list.append({
-            "title": entry.get("title", ""),
-            "link": entry.get("link", ""),
-            "published": entry.get("published", ""),
-            "source": entry.get("source", {}).get("title", "")
-        })
+        news_list.append(
+            {
+                "title": entry.get("title", ""),
+                "link": entry.get("link", ""),
+                "published": entry.get("published", ""),
+                "source": entry.get("source", {}).get("title", ""),
+            }
+        )
 
     return news_list
 
@@ -166,7 +170,7 @@ def get_stock(ticker: str, start: str = None, end: str = None):
 
         data = stock.history(
             start=start_date,
-            end=end_date
+            end=end_date,
         )
 
         if data.empty or len(data) < 2:
@@ -190,39 +194,50 @@ def get_stock(ticker: str, start: str = None, end: str = None):
         prices = []
 
         for _, row in data.iterrows():
-            prices.append({
-                "date": str(row["Date"])[:10],
-                "open": round(float(row["Open"]), 2),
-                "high": round(float(row["High"]), 2),
-                "low": round(float(row["Low"]), 2),
-                "close": round(float(row["Close"]), 2),
-                "ma20": None if pd.isna(row["MA20"]) else round(float(row["MA20"]), 2),
-                "bb_upper": None if pd.isna(row["BB_UPPER"]) else round(float(row["BB_UPPER"]), 2),
-                "bb_lower": None if pd.isna(row["BB_LOWER"]) else round(float(row["BB_LOWER"]), 2),
-            })
+            prices.append(
+                {
+                    "date": str(row["Date"])[:10],
+                    "open": round(float(row["Open"]), 2),
+                    "high": round(float(row["High"]), 2),
+                    "low": round(float(row["Low"]), 2),
+                    "close": round(float(row["Close"]), 2),
+                    "ma20": None
+                    if pd.isna(row["MA20"])
+                    else round(float(row["MA20"]), 2),
+                    "bb_upper": None
+                    if pd.isna(row["BB_UPPER"])
+                    else round(float(row["BB_UPPER"]), 2),
+                    "bb_lower": None
+                    if pd.isna(row["BB_LOWER"])
+                    else round(float(row["BB_LOWER"]), 2),
+                }
+            )
 
         try:
             company_name = stock.info.get("shortName", "") or resolved_company_name
         except Exception:
             company_name = resolved_company_name
 
+        asset_name = company_name or resolved_company_name or symbol
+
         news_list = get_google_news(
             symbol=symbol,
-            company_name=company_name,
+            company_name=asset_name,
             quote_type=quote_type,
-            max_news=10
+            max_news=10,
         )
 
         return {
             "query": ticker,
             "ticker": symbol,
+            "asset_name": asset_name,
             "company_name": company_name,
             "quote_type": quote_type,
             "price": round(last, 2),
             "change": round(change, 2),
             "change_pct": round(change_pct, 2),
             "prices": prices,
-            "news": news_list
+            "news": news_list,
         }
 
     except ValueError:
