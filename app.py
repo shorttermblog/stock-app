@@ -6,6 +6,7 @@ import yfinance as yf
 import feedparser
 from urllib.parse import quote
 import pandas as pd
+import requests
 
 app = FastAPI()
 
@@ -17,8 +18,83 @@ def home():
     return FileResponse("static/index.html")
 
 
-def get_google_news(ticker: str, company_name: str = "", max_news: int = 10):
-    query = f'"{ticker}" "{company_name}" stock OR earnings OR shares OR revenue when:7d'
+def resolve_stock_symbol(query: str):
+    """
+    Accepts a company name, ticker, ETF, future, or currency name.
+    Examples:
+    - Apple -> AAPL
+    - Tesla -> TSLA
+    - QQQ -> QQQ
+    - gold futures -> GC=F
+    - crude oil futures -> CL=F
+    - euro dollar -> EURUSD=X
+    """
+
+    query = query.strip()
+
+    if not query:
+        return {
+            "symbol": "",
+            "company_name": "",
+            "quote_type": "",
+        }
+
+    url = "https://query2.finance.yahoo.com/v1/finance/search"
+
+    params = {
+        "q": query,
+        "quotes_count": 10,
+        "news_count": 0,
+    }
+
+    response = requests.get(url, params=params, timeout=10)
+    response.raise_for_status()
+
+    results = response.json().get("quotes", [])
+
+    allowed_quote_types = {
+        "EQUITY",
+        "ETF",
+        "FUTURE",
+        "CURRENCY",
+    }
+
+    for item in results:
+        quote_type = item.get("quoteType", "")
+        symbol = item.get("symbol", "")
+        short_name = item.get("shortname", "") or item.get("longname", "")
+
+        if symbol and quote_type in allowed_quote_types:
+            return {
+                "symbol": symbol,
+                "company_name": short_name,
+                "quote_type": quote_type,
+            }
+
+    return {
+        "symbol": query.upper(),
+        "company_name": "",
+        "quote_type": "",
+    }
+
+
+def get_google_news(
+    symbol: str,
+    company_name: str = "",
+    quote_type: str = "",
+    max_news: int = 10
+):
+    """
+    Builds a better news query depending on the instrument type.
+    Stocks/ETFs use stock-related terms.
+    Futures/currencies use market-related terms.
+    """
+
+    if quote_type in {"FUTURE", "CURRENCY"}:
+        query = f'"{symbol}" "{company_name}" market OR price OR forecast OR inflation OR rates when:7d'
+    else:
+        query = f'"{symbol}" "{company_name}" stock OR earnings OR shares OR revenue when:7d'
+
     encoded_query = quote(query)
 
     url = (
@@ -44,14 +120,36 @@ def get_google_news(ticker: str, company_name: str = "", max_news: int = 10):
 @app.get("/api/stock")
 def get_stock(ticker: str, start: str = None, end: str = None):
     try:
-        end_date = date.today() if not end else date.fromisoformat(end)
-        start_date = end_date - timedelta(days=365 * 2) if not start else date.fromisoformat(start)
+        resolved = resolve_stock_symbol(ticker)
 
-        stock = yf.Ticker(ticker.upper())
-        data = stock.history(start=start_date, end=end_date)
+        symbol = resolved["symbol"]
+        resolved_company_name = resolved["company_name"]
+        quote_type = resolved["quote_type"]
+
+        if not symbol:
+            return {
+                "error": "Inserisci un nome valido, ad esempio Apple, Tesla, gold futures o euro dollar"
+            }
+
+        end_date = date.today() if not end else date.fromisoformat(end)
+
+        start_date = (
+            end_date - timedelta(days=365 * 2)
+            if not start
+            else date.fromisoformat(start)
+        )
+
+        stock = yf.Ticker(symbol)
+
+        data = stock.history(
+            start=start_date,
+            end=end_date
+        )
 
         if data.empty or len(data) < 2:
-            return {"error": "Ticker non valido o pochi dati"}
+            return {
+                "error": "Strumento non valido o pochi dati disponibili"
+            }
 
         data = data.reset_index()
 
@@ -81,14 +179,22 @@ def get_stock(ticker: str, start: str = None, end: str = None):
             })
 
         try:
-            company_name = stock.info.get("shortName", "")
-        except:
-            company_name = ""
+            company_name = stock.info.get("shortName", "") or resolved_company_name
+        except Exception:
+            company_name = resolved_company_name
 
-        news_list = get_google_news(ticker.upper(), company_name, max_news=10)
+        news_list = get_google_news(
+            symbol=symbol,
+            company_name=company_name,
+            quote_type=quote_type,
+            max_news=10
+        )
 
         return {
-            "ticker": ticker.upper(),
+            "query": ticker,
+            "ticker": symbol,
+            "company_name": company_name,
+            "quote_type": quote_type,
             "price": round(last, 2),
             "change": round(change, 2),
             "change_pct": round(change_pct, 2),
@@ -96,5 +202,17 @@ def get_stock(ticker: str, start: str = None, end: str = None):
             "news": news_list
         }
 
+    except ValueError:
+        return {
+            "error": "Formato data non valido. Usa YYYY-MM-DD."
+        }
+
+    except requests.exceptions.RequestException:
+        return {
+            "error": "Errore durante la ricerca dello strumento su Yahoo Finance"
+        }
+
     except Exception as e:
-        return {"error": str(e)}
+        return {
+            "error": str(e)
+        }
