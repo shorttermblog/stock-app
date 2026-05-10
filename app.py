@@ -74,7 +74,8 @@ def resolve_stock_symbol(query: str):
             "FUTURE",
             "CURRENCY",
             "INDEX",
-            "CRYPTOCURRENCY"
+            "CRYPTOCURRENCY",
+            "MUTUALFUND"
         }
 
         for item in results:
@@ -111,7 +112,7 @@ def get_google_news(
     Futures/currencies use market-related terms.
     """
 
-    if quote_type in {"FUTURE", "CURRENCY", "INDEX","CRYPTOCURRENCY"}:
+    if quote_type in {"FUTURE", "CURRENCY", "INDEX","CRYPTOCURRENCY", "MUTUALFUND"}:
         search_query = (
             f'"{symbol}" "{company_name}" '
             f'market OR price OR forecast OR inflation OR rates when:7d'
