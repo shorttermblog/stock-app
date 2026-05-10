@@ -28,6 +28,8 @@ def resolve_stock_symbol(query: str):
     - gold futures -> GC=F
     - crude oil futures -> CL=F
     - euro dollar -> EURUSD=X
+
+    If Yahoo search fails, it falls back to treating the input as a direct symbol.
     """
 
     query = query.strip()
@@ -47,30 +49,45 @@ def resolve_stock_symbol(query: str):
         "news_count": 0,
     }
 
-    response = requests.get(url, params=params, timeout=10)
-    response.raise_for_status()
-
-    results = response.json().get("quotes", [])
-
-    allowed_quote_types = {
-        "EQUITY",
-        "ETF",
-        "FUTURE",
-        "CURRENCY",
+    headers = {
+        "User-Agent": "Mozilla/5.0"
     }
 
-    for item in results:
-        quote_type = item.get("quoteType", "")
-        symbol = item.get("symbol", "")
-        short_name = item.get("shortname", "") or item.get("longname", "")
+    try:
+        response = requests.get(
+            url,
+            params=params,
+            headers=headers,
+            timeout=10
+        )
 
-        if symbol and quote_type in allowed_quote_types:
-            return {
-                "symbol": symbol,
-                "company_name": short_name,
-                "quote_type": quote_type,
-            }
+        response.raise_for_status()
 
+        results = response.json().get("quotes", [])
+
+        allowed_quote_types = {
+            "EQUITY",
+            "ETF",
+            "FUTURE",
+            "CURRENCY",
+        }
+
+        for item in results:
+            quote_type = item.get("quoteType", "")
+            symbol = item.get("symbol", "")
+            short_name = item.get("shortname", "") or item.get("longname", "")
+
+            if symbol and quote_type in allowed_quote_types:
+                return {
+                    "symbol": symbol,
+                    "company_name": short_name,
+                    "quote_type": quote_type,
+                }
+
+    except requests.exceptions.RequestException:
+        pass
+
+    # Fallback: assume the user typed a valid ticker/symbol
     return {
         "symbol": query.upper(),
         "company_name": "",
@@ -91,11 +108,17 @@ def get_google_news(
     """
 
     if quote_type in {"FUTURE", "CURRENCY"}:
-        query = f'"{symbol}" "{company_name}" market OR price OR forecast OR inflation OR rates when:7d'
+        search_query = (
+            f'"{symbol}" "{company_name}" '
+            f'market OR price OR forecast OR inflation OR rates when:7d'
+        )
     else:
-        query = f'"{symbol}" "{company_name}" stock OR earnings OR shares OR revenue when:7d'
+        search_query = (
+            f'"{symbol}" "{company_name}" '
+            f'stock OR earnings OR shares OR revenue when:7d'
+        )
 
-    encoded_query = quote(query)
+    encoded_query = quote(search_query)
 
     url = (
         "https://news.google.com/rss/search?"
@@ -205,11 +228,6 @@ def get_stock(ticker: str, start: str = None, end: str = None):
     except ValueError:
         return {
             "error": "Formato data non valido. Usa YYYY-MM-DD."
-        }
-
-    except requests.exceptions.RequestException:
-        return {
-            "error": "Errore durante la ricerca dello strumento su Yahoo Finance"
         }
 
     except Exception as e:
