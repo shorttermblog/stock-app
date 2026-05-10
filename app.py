@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from urllib.parse import quote
 
 import feedparser
 import pandas as pd
@@ -8,7 +9,6 @@ import yfinance as yf
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from urllib.parse import quote
 
 
 app = FastAPI()
@@ -21,13 +21,100 @@ def home():
     return FileResponse("static/index.html")
 
 
+ALLOWED_QUOTE_TYPES = {
+    "EQUITY",
+    "ETF",
+    "FUTURE",
+    "CURRENCY",
+    "INDEX",
+    "CRYPTOCURRENCY",
+    "MUTUALFUND",
+}
+
+
+@app.get("/api/search")
+def search_assets(q: str):
+    """
+    Returns Yahoo Finance-like suggestions for stocks, ETFs, futures,
+    currencies, indices, crypto, and mutual funds.
+    """
+
+    query = q.strip()
+
+    if not query:
+        return {"results": []}
+
+    url = "https://query2.finance.yahoo.com/v1/finance/search"
+
+    params = {
+        "q": query,
+        "quotes_count": 12,
+        "news_count": 0,
+    }
+
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+    }
+
+    try:
+        response = requests.get(
+            url,
+            params=params,
+            headers=headers,
+            timeout=10,
+        )
+
+        response.raise_for_status()
+
+        yahoo_results = response.json().get("quotes", [])
+
+        results = []
+
+        for item in yahoo_results:
+            symbol = item.get("symbol", "")
+            quote_type = item.get("quoteType", "")
+
+            if not symbol:
+                continue
+
+            if quote_type not in ALLOWED_QUOTE_TYPES:
+                continue
+
+            name = (
+                item.get("shortname")
+                or item.get("longname")
+                or item.get("name")
+                or symbol
+            )
+
+            results.append(
+                {
+                    "symbol": symbol,
+                    "name": name,
+                    "quote_type": quote_type,
+                    "exchange": item.get("exchange", ""),
+                    "exchange_name": item.get("exchDisp", ""),
+                    "type_display": item.get("typeDisp", ""),
+                }
+            )
+
+        return {"results": results}
+
+    except requests.exceptions.RequestException:
+        return {"results": []}
+
+
 def resolve_stock_symbol(query: str):
     """
-    Accepts a company name, ticker, ETF, future, or currency name.
+    Accepts a company name, ticker, ETF, index, future, currency,
+    cryptocurrency, or mutual fund name.
+
     Examples:
     - Apple -> AAPL
     - Tesla -> TSLA
     - QQQ -> QQQ
+    - S&P 500 -> ^GSPC
+    - Bitcoin USD -> BTC-USD
     - gold futures -> GC=F
     - crude oil futures -> CL=F
     - euro dollar -> EURUSD=X
@@ -68,22 +155,18 @@ def resolve_stock_symbol(query: str):
 
         results = response.json().get("quotes", [])
 
-        allowed_quote_types = {
-            "EQUITY",
-            "ETF",
-            "FUTURE",
-            "CURRENCY",
-            "INDEX",
-            "CRYPTOCURRENCY",
-            "MUTUALFUND"
-        }
-
         for item in results:
             quote_type = item.get("quoteType", "")
             symbol = item.get("symbol", "")
-            short_name = item.get("shortname", "") or item.get("longname", "")
 
-            if symbol and quote_type in allowed_quote_types:
+            short_name = (
+                item.get("shortname")
+                or item.get("longname")
+                or item.get("name")
+                or ""
+            )
+
+            if symbol and quote_type in ALLOWED_QUOTE_TYPES:
                 return {
                     "symbol": symbol,
                     "company_name": short_name,
@@ -107,20 +190,34 @@ def get_google_news(
     max_news: int = 10,
 ):
     """
-    Builds a better news query depending on the instrument type.
-    Stocks/ETFs use stock-related terms.
-    Futures/currencies use market-related terms.
+    Builds a news query depending on the instrument type.
+    Uses OR between symbol and company name so the search is less restrictive.
     """
 
-    if quote_type in {"FUTURE", "CURRENCY", "INDEX","CRYPTOCURRENCY", "MUTUALFUND"}:
+    symbol = symbol.strip()
+    company_name = company_name.strip()
+
+    if company_name:
+        asset_query = f'("{symbol}" OR "{company_name}")'
+    else:
+        asset_query = f'"{symbol}"'
+
+    if quote_type in {
+        "ETF",
+        "FUTURE",
+        "CURRENCY",
+        "INDEX",
+        "CRYPTOCURRENCY",
+        "MUTUALFUND",
+    }:
         search_query = (
-            f'"{symbol}" "{company_name}" '
-            f'market OR price OR forecast OR inflation OR rates when:7d'
+            f"{asset_query} "
+            f"market OR price OR forecast OR inflation OR rates OR fund OR ETF when:7d"
         )
     else:
         search_query = (
-            f'"{symbol}" "{company_name}" '
-            f'stock OR earnings OR shares OR revenue when:7d'
+            f"{asset_query} "
+            f"stock OR earnings OR shares OR revenue when:7d"
         )
 
     encoded_query = quote(search_query)
@@ -158,7 +255,7 @@ def get_stock(ticker: str, start: str = None, end: str = None):
 
         if not symbol:
             return {
-                "error": "Inserisci un nome valido, ad esempio Apple, Tesla, gold futures o euro dollar"
+                "error": "Inserisci un nome valido, ad esempio Apple, Tesla, gold futures, Bitcoin USD o euro dollar."
             }
 
         end_date = date.today() if not end else date.fromisoformat(end)
@@ -169,6 +266,11 @@ def get_stock(ticker: str, start: str = None, end: str = None):
             else date.fromisoformat(start)
         )
 
+        if start_date >= end_date:
+            return {
+                "error": "La data iniziale deve essere precedente alla data finale."
+            }
+
         stock = yf.Ticker(symbol)
 
         data = stock.history(
@@ -178,7 +280,7 @@ def get_stock(ticker: str, start: str = None, end: str = None):
 
         if data.empty or len(data) < 2:
             return {
-                "error": "Strumento non valido o pochi dati disponibili"
+                "error": "Strumento non valido o pochi dati disponibili."
             }
 
         data = data.reset_index()
@@ -248,7 +350,7 @@ def get_stock(ticker: str, start: str = None, end: str = None):
             "error": "Formato data non valido. Usa YYYY-MM-DD."
         }
 
-    except Exception as e:
+    except Exception:
         return {
-            "error": str(e)
+            "error": "Unable to load asset data right now. Please try again later."
         }
