@@ -63,6 +63,68 @@
       background: #1d4ed8;
     }
 
+    .asset-search {
+      position: relative;
+      width: 100%;
+    }
+
+    .suggestions {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 16px 35px rgba(0, 0, 0, 0.35);
+      max-height: 340px;
+      overflow-y: auto;
+    }
+
+    .suggestion-item {
+      padding: 11px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #334155;
+    }
+
+    .suggestion-item:last-child {
+      border-bottom: none;
+    }
+
+    .suggestion-item:hover,
+    .suggestion-item.active {
+      background: #334155;
+    }
+
+    .suggestion-main {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .suggestion-name {
+      color: #e5e7eb;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .suggestion-symbol {
+      color: #93c5fd;
+      white-space: nowrap;
+    }
+
+    .suggestion-meta {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
     .cards {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -248,7 +310,11 @@
     <h1>Asset Dashboard</h1>
 
     <form class="controls" id="assetForm">
-      <input id="ticker" value="Apple" placeholder="Asset">
+      <div class="asset-search">
+        <input id="ticker" value="Apple" placeholder="Asset" autocomplete="off">
+        <div id="suggestions" class="suggestions"></div>
+      </div>
+
       <input id="start" type="date">
       <input id="end" type="date">
       <button type="submit">Load</button>
@@ -294,6 +360,13 @@
     let bbUpperSeries = null;
     let bbLowerSeries = null;
 
+    let suggestions = [];
+    let activeSuggestionIndex = -1;
+    let searchTimeout = null;
+
+    const tickerInput = document.getElementById("ticker");
+    const suggestionsEl = document.getElementById("suggestions");
+
     function setDefaultDates() {
       const today = new Date();
       const endDate = today.toISOString().split("T")[0];
@@ -317,15 +390,104 @@
       });
     }
 
+    function hideSuggestions() {
+      suggestionsEl.style.display = "none";
+      suggestionsEl.innerHTML = "";
+      activeSuggestionIndex = -1;
+    }
+
+    function showSuggestions(items) {
+      suggestions = items || [];
+      activeSuggestionIndex = -1;
+
+      suggestionsEl.innerHTML = "";
+
+      if (suggestions.length === 0) {
+        hideSuggestions();
+        return;
+      }
+
+      suggestions.forEach((item, index) => {
+        const div = document.createElement("div");
+        div.className = "suggestion-item";
+        div.dataset.index = index;
+
+        const exchangeText = item.exchange_name || item.exchange || "";
+        const typeText = item.type_display || item.quote_type || "";
+
+        div.innerHTML = `
+          <div class="suggestion-main">
+            <span class="suggestion-name">${item.name}</span>
+            <span class="suggestion-symbol">${item.symbol}</span>
+          </div>
+          <div class="suggestion-meta">${typeText}${exchangeText ? " · " + exchangeText : ""}</div>
+        `;
+
+        div.addEventListener("mousedown", function (event) {
+          event.preventDefault();
+          chooseSuggestion(index);
+        });
+
+        suggestionsEl.appendChild(div);
+      });
+
+      suggestionsEl.style.display = "block";
+    }
+
+    function updateActiveSuggestion() {
+      const items = suggestionsEl.querySelectorAll(".suggestion-item");
+
+      items.forEach((item, index) => {
+        item.classList.toggle("active", index === activeSuggestionIndex);
+      });
+    }
+
+    function chooseSuggestion(index) {
+      const item = suggestions[index];
+
+      if (!item) {
+        return;
+      }
+
+      tickerInput.value = item.name || item.symbol;
+      tickerInput.dataset.symbol = item.symbol;
+      tickerInput.dataset.name = item.name || item.symbol;
+      tickerInput.dataset.quoteType = item.quote_type || "";
+
+      hideSuggestions();
+      load();
+    }
+
+    async function fetchSuggestions(query) {
+      if (!query || query.length < 2) {
+        hideSuggestions();
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+
+        showSuggestions(data.results || []);
+      } catch (error) {
+        hideSuggestions();
+      }
+    }
+
     async function load() {
-      const t = document.getElementById("ticker").value.trim();
+      const inputValue = tickerInput.value.trim();
+      const selectedSymbol = tickerInput.dataset.symbol || "";
+      const t = selectedSymbol || inputValue;
+
       const s = document.getElementById("start").value;
       const e = document.getElementById("end").value;
 
       if (!t) {
-        alert("Insert an asset, for example Apple, Tesla, QQQ, gold futures or euro dollar.");
+        alert("Insert an asset, for example Apple, Tesla, QQQ, gold futures, Bitcoin USD or euro dollar.");
         return;
       }
+
+      hideSuggestions();
 
       let url = `/api/stock?ticker=${encodeURIComponent(t)}`;
       if (s) url += `&start=${encodeURIComponent(s)}`;
@@ -503,6 +665,65 @@
         height: chartContainer.clientHeight
       });
     }
+
+    tickerInput.addEventListener("input", function () {
+      const query = tickerInput.value.trim();
+
+      tickerInput.dataset.symbol = "";
+      tickerInput.dataset.name = "";
+      tickerInput.dataset.quoteType = "";
+
+      clearTimeout(searchTimeout);
+
+      searchTimeout = setTimeout(() => {
+        fetchSuggestions(query);
+      }, 250);
+    });
+
+    tickerInput.addEventListener("keydown", function (event) {
+      if (suggestionsEl.style.display !== "block") {
+        return;
+      }
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+
+        activeSuggestionIndex = Math.min(
+          activeSuggestionIndex + 1,
+          suggestions.length - 1
+        );
+
+        updateActiveSuggestion();
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+
+        activeSuggestionIndex = Math.max(
+          activeSuggestionIndex - 1,
+          0
+        );
+
+        updateActiveSuggestion();
+      }
+
+      if (event.key === "Enter") {
+        if (activeSuggestionIndex >= 0) {
+          event.preventDefault();
+          chooseSuggestion(activeSuggestionIndex);
+        }
+      }
+
+      if (event.key === "Escape") {
+        hideSuggestions();
+      }
+    });
+
+    document.addEventListener("click", function (event) {
+      if (!event.target.closest(".asset-search")) {
+        hideSuggestions();
+      }
+    });
 
     document.getElementById("assetForm").addEventListener("submit", function (event) {
       event.preventDefault();
