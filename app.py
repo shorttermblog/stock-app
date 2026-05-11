@@ -258,25 +258,47 @@ def get_stock(ticker: str, start: str = None, end: str = None):
                 "error": "Inserisci un nome valido, ad esempio Apple, Tesla, gold futures, Bitcoin USD o euro dollar."
             }
 
-        end_date = date.today() if not end else date.fromisoformat(end)
-
-        start_date = (
-            end_date - timedelta(days=365 * 2)
-            if not start
-            else date.fromisoformat(start)
-        )
-
-        if start_date >= end_date:
-            return {
-                "error": "La data iniziale deve essere precedente alla data finale."
-            }
-
         stock = yf.Ticker(symbol)
 
-        data = stock.history(
-            start=start_date,
-            end=end_date,
-        )
+        # ------------------------------------------------------------
+        # Date handling
+        # ------------------------------------------------------------
+        # If the user does not pass start/end, use Yahoo's period-based
+        # daily historical data. This is closer to Yahoo Finance's own
+        # historical daily view and can include the latest available
+        # daily candle during the session.
+        #
+        # If the user passes custom dates, use start/end, but add one day
+        # to end because yfinance treats end as exclusive.
+        # ------------------------------------------------------------
+
+        if start is None and end is None:
+            data = stock.history(
+                period="2y",
+                interval="1d",
+                auto_adjust=False,
+            )
+
+        else:
+            end_date = date.today() if not end else date.fromisoformat(end)
+
+            start_date = (
+                end_date - timedelta(days=365 * 2)
+                if not start
+                else date.fromisoformat(start)
+            )
+
+            if start_date >= end_date:
+                return {
+                    "error": "La data iniziale deve essere precedente alla data finale."
+                }
+
+            data = stock.history(
+                start=start_date,
+                end=end_date + timedelta(days=1),
+                interval="1d",
+                auto_adjust=False,
+            )
 
         if data.empty or len(data) < 2:
             return {
