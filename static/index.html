@@ -211,23 +211,35 @@
       border-radius: 16px;
     }
 
-    .news-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
     .news h3 {
-      margin: 0;
+      margin-top: 0;
+      margin-bottom: 14px;
     }
 
     .summary-button {
-      width: auto;
-      padding: 10px 14px;
-      font-size: 14px;
-      white-space: nowrap;
+      display: block;
+      width: 100%;
+      margin: 16px 0 20px 0;
+      padding: 16px 18px;
+      border-radius: 12px;
+      border: 2px solid #93c5fd;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .summary-button:hover {
+      background: #1d4ed8;
+    }
+
+    .summary-button:disabled {
+      background: #475569;
+      border-color: #64748b;
+      color: #cbd5e1;
+      cursor: not-allowed;
     }
 
     .news-summary {
@@ -323,15 +335,6 @@
         padding: 16px;
       }
 
-      .news-header {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      .summary-button {
-        width: 100%;
-      }
-
       .news-summary {
         padding: 14px;
       }
@@ -412,12 +415,11 @@
     </div>
 
     <div class="news">
-      <div class="news-header">
-        <h3>Latest News</h3>
-        <button id="summaryButton" class="summary-button" type="button" disabled>
-          Generate AI Summary
-        </button>
-      </div>
+      <h3>Latest News</h3>
+
+      <button id="summaryButton" class="summary-button" type="button" disabled>
+        Generate AI News Summary
+      </button>
 
       <div class="news-summary" id="newsSummaryBox" style="display: none;">
         <div class="news-summary-title">AI News Summary</div>
@@ -484,7 +486,7 @@
       newsSummaryBox.style.display = "none";
       newsSummaryEl.innerText = "";
       summaryButton.disabled = true;
-      summaryButton.innerText = "Generate AI Summary";
+      summaryButton.innerText = "Generate AI News Summary";
       cachedSummaryKey = "";
       cachedSummaryText = "";
     }
@@ -589,7 +591,7 @@
       }
 
       summaryButton.disabled = true;
-      summaryButton.innerText = "Generating...";
+      summaryButton.innerText = "Generating Summary...";
 
       newsSummaryBox.style.display = "block";
       newsSummaryEl.innerText = "Generating news summary...";
@@ -620,7 +622,7 @@
         newsSummaryEl.innerText = "News summary unavailable right now.";
       } finally {
         summaryButton.disabled = false;
-        summaryButton.innerText = "Generate AI Summary";
+        summaryButton.innerText = "Generate AI News Summary";
       }
     }
 
@@ -808,6 +810,7 @@
         newsEl.appendChild(li);
 
         summaryButton.disabled = true;
+        summaryButton.innerText = "No News to Summarize";
       } else {
         data.news.forEach(n => {
           const li = document.createElement("li");
@@ -816,6 +819,7 @@
         });
 
         summaryButton.disabled = false;
+        summaryButton.innerText = "Generate AI News Summary";
       }
 
       chart.applyOptions({
@@ -925,75 +929,7 @@
     load();
   </script>
 </body>
-</html>      if (event.key === "ArrowDown") {
-        event.preventDefault();
-
-        activeSuggestionIndex = Math.min(
-          activeSuggestionIndex + 1,
-          suggestions.length - 1
-        );
-
-        updateActiveSuggestion();
-      }
-
-      if (event.key === "ArrowUp") {
-        event.preventDefault();
-
-        activeSuggestionIndex = Math.max(
-          activeSuggestionIndex - 1,
-          0
-        );
-
-        updateActiveSuggestion();
-      }
-
-      if (event.key === "Enter") {
-        if (activeSuggestionIndex >= 0) {
-          event.preventDefault();
-          chooseSuggestion(activeSuggestionIndex);
-        }
-      }
-
-      if (event.key === "Escape") {
-        hideSuggestions();
-      }
-    });
-
-    document.addEventListener("click", function (event) {
-      if (!event.target.closest(".asset-search")) {
-        hideSuggestions();
-      }
-    });
-
-    document.getElementById("assetForm").addEventListener("submit", function (event) {
-      event.preventDefault();
-      load();
-    });
-
-    document.getElementById("toggleBB").addEventListener("change", function () {
-      const show = this.checked;
-
-      if (bbUpperSeries && bbLowerSeries) {
-        bbUpperSeries.applyOptions({
-          visible: show
-        });
-
-        bbLowerSeries.applyOptions({
-          visible: show
-        });
-      }
-    });
-
-    window.addEventListener("resize", () => {
-      const chartContainer = document.getElementById("chart");
-
-      if (chart) {
-        chart.applyOptions({
-          width: chartContainer.clientWidth,
-          height: chartContainer.clientHeight
-        });
-      }
-    });
+</html>
 
     setDefaultDates();
     load();
