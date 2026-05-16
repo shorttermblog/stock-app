@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from email.utils import parsedate_to_datetime
 from urllib.parse import quote
 import os
 
@@ -199,6 +200,21 @@ def resolve_stock_symbol(query: str):
     }
 
 
+def safe_parse_published_date(published: str):
+    """
+    Converts an RSS published string into a datetime.
+    Returns None if the date is missing or invalid.
+    """
+
+    if not published:
+        return None
+
+    try:
+        return parsedate_to_datetime(published)
+    except Exception:
+        return None
+
+
 def get_google_news(
     symbol: str,
     company_name: str = "",
@@ -206,8 +222,9 @@ def get_google_news(
     max_news: int = 10,
 ):
     """
-    Builds a news query depending on the instrument type.
-    Uses OR between symbol and company name so the search is less restrictive.
+    Gets recent Google News RSS items from the last 24 hours.
+    Articles without a valid publication date are ignored.
+    Results are sorted newest first.
     """
 
     symbol = symbol.strip()
@@ -228,12 +245,14 @@ def get_google_news(
     }:
         search_query = (
             f"{asset_query} "
-            f"market OR price OR forecast OR inflation OR rates OR fund OR ETF when:1d"
+            f"(market OR price OR forecast OR inflation OR rates OR fund OR ETF) "
+            f"when:1d"
         )
     else:
         search_query = (
             f"{asset_query} "
-            f"stock OR earnings OR shares OR revenue when:1d"
+            f"(stock OR earnings OR shares OR revenue) "
+            f"when:1d"
         )
 
     encoded_query = quote(search_query)
@@ -248,23 +267,41 @@ def get_google_news(
     news_list = []
 
     for entry in feed.entries:
-    published = entry.get("published", "").strip()
+        published = entry.get("published", "").strip()
+        published_datetime = safe_parse_published_date(published)
 
-    # Skip articles with no publication date
-    if not published:
-        continue
+        # Skip articles with no date or invalid date
+        if published_datetime is None:
+            continue
 
-    news_list.append(
-        {
-            "title": entry.get("title", ""),
-            "link": entry.get("link", ""),
-            "published": published,
-            "source": entry.get("source", {}).get("title", ""),
-        }
+        news_list.append(
+            {
+                "title": entry.get("title", ""),
+                "link": entry.get("link", ""),
+                "published": published,
+                "published_datetime": published_datetime,
+                "source": entry.get("source", {}).get("title", ""),
+            }
+        )
+
+    news_list.sort(
+        key=lambda item: item["published_datetime"],
+        reverse=True,
     )
 
-    if len(news_list) >= max_news:
-        break
+    cleaned_news_list = []
+
+    for item in news_list[:max_news]:
+        cleaned_news_list.append(
+            {
+                "title": item["title"],
+                "link": item["link"],
+                "published": item["published"],
+                "source": item["source"],
+            }
+        )
+
+    return cleaned_news_list
 
 
 def summarize_news_with_chatgpt(
@@ -312,6 +349,8 @@ Instructions:
 - Focus on what the headlines suggest is currently driving attention around the asset.
 - Mention earnings, revenue, macro, rates, commodities, crypto, sector trends, regulation, or analyst coverage only if they appear in the provided headlines.
 - Organize the summary as bullet points.
+- Use 4 to 6 bullet points.
+- Each bullet should focus on one clear theme.
 - Keep the summary under 150 words.
 - Write in clear English.
 """
