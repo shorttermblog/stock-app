@@ -304,6 +304,7 @@ Instructions:
 - Do not give investment advice.
 - Focus on what the headlines suggest is currently driving attention around the asset.
 - Mention earnings, revenue, macro, rates, commodities, crypto, sector trends, regulation, or analyst coverage only if they appear in the provided headlines.
+- Organize the summary as bullet points.
 - Keep the summary under 150 words.
 - Write in clear English.
 """
