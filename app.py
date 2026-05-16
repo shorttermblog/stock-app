@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from urllib.parse import quote
+import os
 
 import feedparser
 import pandas as pd
@@ -10,6 +11,8 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from openai import OpenAI
+
 
 app = FastAPI()
 
@@ -19,6 +22,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/")
 def home():
     return FileResponse("static/index.html")
+
+
+# OpenAI client
+# Make sure you set OPENAI_API_KEY in your environment.
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 ALLOWED_QUOTE_TYPES = {
@@ -244,6 +252,66 @@ def get_google_news(
     return news_list
 
 
+def summarize_news_with_chatgpt(
+    ticker: str,
+    asset_name: str,
+    quote_type: str,
+    news_list: list,
+):
+    """
+    Uses ChatGPT to summarize recent news related to the selected ticker.
+    The summary is based only on the news titles, sources, and publication dates.
+    """
+
+    if not news_list:
+        return "No recent news available for this asset."
+
+    if not os.getenv("OPENAI_API_KEY"):
+        return "News summary unavailable because OPENAI_API_KEY is not configured."
+
+    news_text = "\n".join(
+        [
+            f"- Title: {item.get('title', '')}\n"
+            f"  Source: {item.get('source', '')}\n"
+            f"  Published: {item.get('published', '')}"
+            for item in news_list
+        ]
+    )
+
+    prompt = f"""
+You are a financial news analyst.
+
+Summarize the recent news for this asset.
+
+Ticker: {ticker}
+Asset name: {asset_name}
+Quote type: {quote_type}
+
+News items:
+{news_text}
+
+Instructions:
+- Use only the provided news headlines, sources, and publication dates.
+- Do not invent facts.
+- Do not give investment advice.
+- Focus on what the headlines suggest is currently driving attention around the asset.
+- Mention earnings, revenue, macro, rates, commodities, crypto, sector trends, regulation, or analyst coverage only if they appear in the provided headlines.
+- Keep the summary under 150 words.
+- Write in clear English.
+"""
+
+    try:
+        response = client.responses.create(
+            model="gpt-4.1-mini",
+            input=prompt,
+        )
+
+        return response.output_text.strip()
+
+    except Exception:
+        return "News summary unavailable right now."
+
+
 @app.get("/api/stock")
 def get_stock(ticker: str, start: str = None, end: str = None):
     try:
@@ -354,6 +422,13 @@ def get_stock(ticker: str, start: str = None, end: str = None):
             max_news=10,
         )
 
+        news_summary = summarize_news_with_chatgpt(
+            ticker=symbol,
+            asset_name=asset_name,
+            quote_type=quote_type,
+            news_list=news_list,
+        )
+
         return {
             "query": ticker,
             "ticker": symbol,
@@ -365,6 +440,7 @@ def get_stock(ticker: str, start: str = None, end: str = None):
             "change_pct": round(change_pct, 2),
             "prices": prices,
             "news": news_list,
+            "news_summary": news_summary,
         }
 
     except ValueError:
