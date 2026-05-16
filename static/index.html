@@ -264,7 +264,12 @@
       color: #e5e7eb;
       font-size: 15px;
       margin: 0;
-      white-space: pre-line;
+      padding-left: 22px;
+    }
+
+    .news-summary-text li {
+      margin-bottom: 10px;
+      line-height: 1.5;
     }
 
     .news ul {
@@ -423,7 +428,7 @@
 
       <div class="news-summary" id="newsSummaryBox" style="display: none;">
         <div class="news-summary-title">AI News Summary</div>
-        <p class="news-summary-text" id="newsSummary"></p>
+        <ul class="news-summary-text" id="newsSummary"></ul>
       </div>
 
       <ul id="news"></ul>
@@ -482,9 +487,39 @@
       return `${asset.ticker}|${asset.asset_name}|${asset.quote_type}|${newsTitles}`;
     }
 
+    function renderSummary(summary) {
+      newsSummaryEl.innerHTML = "";
+
+      if (!summary) {
+        const li = document.createElement("li");
+        li.innerText = "Summary unavailable.";
+        newsSummaryEl.appendChild(li);
+        return;
+      }
+
+      const bulletLines = summary
+        .split("\n")
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map(line => line.replace(/^[-•]\s*/, ""));
+
+      bulletLines.forEach(line => {
+        const li = document.createElement("li");
+        li.innerText = line;
+        newsSummaryEl.appendChild(li);
+      });
+    }
+
+    function showSummaryMessage(message) {
+      newsSummaryEl.innerHTML = "";
+      const li = document.createElement("li");
+      li.innerText = message;
+      newsSummaryEl.appendChild(li);
+    }
+
     function resetSummaryState() {
       newsSummaryBox.style.display = "none";
-      newsSummaryEl.innerText = "";
+      newsSummaryEl.innerHTML = "";
       summaryButton.disabled = true;
       summaryButton.innerText = "Generate AI News Summary";
       cachedSummaryKey = "";
@@ -578,7 +613,7 @@
     async function generateNewsSummary() {
       if (!currentAsset || !currentAsset.news || currentAsset.news.length === 0) {
         newsSummaryBox.style.display = "block";
-        newsSummaryEl.innerText = "No news available to summarize.";
+        showSummaryMessage("No news available to summarize.");
         return;
       }
 
@@ -586,7 +621,7 @@
 
       if (cachedSummaryKey === summaryKey && cachedSummaryText) {
         newsSummaryBox.style.display = "block";
-        newsSummaryEl.innerText = cachedSummaryText;
+        renderSummary(cachedSummaryText);
         return;
       }
 
@@ -594,7 +629,7 @@
       summaryButton.innerText = "Generating Summary...";
 
       newsSummaryBox.style.display = "block";
-      newsSummaryEl.innerText = "Generating news summary...";
+      showSummaryMessage("Generating news summary...");
 
       try {
         const response = await fetch("/api/news-summary", {
@@ -617,9 +652,9 @@
         cachedSummaryKey = summaryKey;
         cachedSummaryText = summary;
 
-        newsSummaryEl.innerText = summary;
+        renderSummary(summary);
       } catch (error) {
-        newsSummaryEl.innerText = "News summary unavailable right now.";
+        showSummaryMessage("News summary unavailable right now.");
       } finally {
         summaryButton.disabled = false;
         summaryButton.innerText = "Generate AI News Summary";
@@ -930,5 +965,3 @@
   </script>
 </body>
 </html>
-
-    
