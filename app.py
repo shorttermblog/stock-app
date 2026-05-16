@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 from email.utils import parsedate_to_datetime
 from urllib.parse import quote
 import os
@@ -222,7 +222,7 @@ def get_google_news(
     max_news: int = 10,
 ):
     """
-    Gets recent Google News RSS items from the last 24 hours.
+    Gets Google News RSS items from the last 24 hours only.
     Articles without a valid publication date are ignored.
     Results are sorted newest first.
     """
@@ -266,6 +266,9 @@ def get_google_news(
 
     news_list = []
 
+    now_utc = datetime.now(timezone.utc)
+    cutoff_utc = now_utc - timedelta(hours=24)
+
     for entry in feed.entries:
         published = entry.get("published", "").strip()
         published_datetime = safe_parse_published_date(published)
@@ -274,12 +277,22 @@ def get_google_news(
         if published_datetime is None:
             continue
 
+        # Make sure datetime is timezone-aware
+        if published_datetime.tzinfo is None:
+            published_datetime = published_datetime.replace(tzinfo=timezone.utc)
+
+        published_datetime_utc = published_datetime.astimezone(timezone.utc)
+
+        # Skip articles older than 24 hours
+        if published_datetime_utc < cutoff_utc:
+            continue
+
         news_list.append(
             {
                 "title": entry.get("title", ""),
                 "link": entry.get("link", ""),
                 "published": published,
-                "published_datetime": published_datetime,
+                "published_datetime": published_datetime_utc,
                 "source": entry.get("source", {}).get("title", ""),
             }
         )
