@@ -210,6 +210,31 @@
       margin-top: 0;
     }
 
+    .news-summary {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .news-summary-title {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: bold;
+    }
+
+    .news-summary-text {
+      line-height: 1.55;
+      color: #e5e7eb;
+      font-size: 15px;
+      margin: 0;
+      white-space: pre-line;
+    }
+
     .news ul {
       padding-left: 20px;
     }
@@ -222,6 +247,10 @@
     .news a {
       color: #93c5fd;
       text-decoration: none;
+    }
+
+    .news a:hover {
+      text-decoration: underline;
     }
 
     @media (max-width: 768px) {
@@ -272,6 +301,10 @@
 
       .news {
         padding: 16px;
+      }
+
+      .news-summary {
+        padding: 14px;
       }
     }
 
@@ -351,6 +384,12 @@
 
     <div class="news">
       <h3>Latest News</h3>
+
+      <div class="news-summary" id="newsSummaryBox" style="display: none;">
+        <div class="news-summary-title">AI News Summary</div>
+        <p class="news-summary-text" id="newsSummary">Loading summary...</p>
+      </div>
+
       <ul id="news"></ul>
     </div>
   </div>
@@ -489,6 +528,12 @@
 
       hideSuggestions();
 
+      const newsSummaryBox = document.getElementById("newsSummaryBox");
+      const newsSummaryEl = document.getElementById("newsSummary");
+
+      newsSummaryBox.style.display = "block";
+      newsSummaryEl.innerText = "Generating news summary...";
+
       let url = `/api/stock?ticker=${encodeURIComponent(t)}`;
       if (s) url += `&start=${encodeURIComponent(s)}`;
       if (e) url += `&end=${encodeURIComponent(e)}`;
@@ -497,6 +542,7 @@
       const data = await res.json();
 
       if (data.error) {
+        newsSummaryBox.style.display = "none";
         alert(data.error);
         return;
       }
@@ -644,6 +690,13 @@
       bbLowerSeries.applyOptions({
         visible: showBB
       });
+
+      if (data.news_summary) {
+        newsSummaryBox.style.display = "block";
+        newsSummaryEl.innerText = data.news_summary;
+      } else {
+        newsSummaryBox.style.display = "none";
+      }
 
       const newsEl = document.getElementById("news");
       newsEl.innerHTML = "";
