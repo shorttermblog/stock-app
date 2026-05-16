@@ -28,7 +28,6 @@ def home():
 # Make sure you set OPENAI_API_KEY in your environment.
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-
 ALLOWED_QUOTE_TYPES = {
     "EQUITY",
     "ETF",
