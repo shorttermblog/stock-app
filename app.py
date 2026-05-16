@@ -228,12 +228,12 @@ def get_google_news(
     }:
         search_query = (
             f"{asset_query} "
-            f"market OR price OR forecast OR inflation OR rates OR fund OR ETF when:7d"
+            f"market OR price OR forecast OR inflation OR rates OR fund OR ETF when:1d"
         )
     else:
         search_query = (
             f"{asset_query} "
-            f"stock OR earnings OR shares OR revenue when:7d"
+            f"stock OR earnings OR shares OR revenue when:1d"
         )
 
     encoded_query = quote(search_query)
