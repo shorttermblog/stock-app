@@ -10,6 +10,7 @@ import yfinance as yf
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from openai import OpenAI
 
@@ -28,6 +29,7 @@ def home():
 # Make sure you set OPENAI_API_KEY in your environment.
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+
 ALLOWED_QUOTE_TYPES = {
     "EQUITY",
     "ETF",
@@ -37,6 +39,13 @@ ALLOWED_QUOTE_TYPES = {
     "CRYPTOCURRENCY",
     "MUTUALFUND",
 }
+
+
+class NewsSummaryRequest(BaseModel):
+    ticker: str
+    asset_name: str
+    quote_type: str = ""
+    news: list
 
 
 @app.get("/api/search")
@@ -311,6 +320,25 @@ Instructions:
         return "News summary unavailable right now."
 
 
+@app.post("/api/news-summary")
+def generate_news_summary(payload: NewsSummaryRequest):
+    """
+    Generates a ChatGPT news summary only when called explicitly,
+    for example when the user clicks a frontend button.
+    """
+
+    summary = summarize_news_with_chatgpt(
+        ticker=payload.ticker,
+        asset_name=payload.asset_name,
+        quote_type=payload.quote_type,
+        news_list=payload.news,
+    )
+
+    return {
+        "news_summary": summary,
+    }
+
+
 @app.get("/api/stock")
 def get_stock(ticker: str, start: str = None, end: str = None):
     try:
@@ -421,13 +449,6 @@ def get_stock(ticker: str, start: str = None, end: str = None):
             max_news=10,
         )
 
-        news_summary = summarize_news_with_chatgpt(
-            ticker=symbol,
-            asset_name=asset_name,
-            quote_type=quote_type,
-            news_list=news_list,
-        )
-
         return {
             "query": ticker,
             "ticker": symbol,
@@ -439,7 +460,7 @@ def get_stock(ticker: str, start: str = None, end: str = None):
             "change_pct": round(change_pct, 2),
             "prices": prices,
             "news": news_list,
-            "news_summary": news_summary,
+            "news_summary": None,
         }
 
     except ValueError:
