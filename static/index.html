@@ -253,23 +253,37 @@
     .news-summary-title {
       font-size: 13px;
       color: #94a3b8;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
       text-transform: uppercase;
       letter-spacing: 0.04em;
       font-weight: bold;
     }
 
     .news-summary-text {
-      line-height: 1.55;
       color: #e5e7eb;
       font-size: 15px;
       margin: 0;
-      padding-left: 22px;
     }
 
-    .news-summary-text li {
-      margin-bottom: 10px;
+    .summary-row {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
       line-height: 1.5;
+    }
+
+    .summary-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .summary-bullet {
+      color: #93c5fd;
+      font-weight: bold;
+    }
+
+    .summary-content {
+      color: #e5e7eb;
     }
 
     .news ul {
@@ -428,7 +442,7 @@
 
       <div class="news-summary" id="newsSummaryBox" style="display: none;">
         <div class="news-summary-title">AI News Summary</div>
-        <ul class="news-summary-text" id="newsSummary"></ul>
+        <div class="news-summary-text" id="newsSummary"></div>
       </div>
 
       <ul id="news"></ul>
@@ -491,30 +505,58 @@
       newsSummaryEl.innerHTML = "";
 
       if (!summary) {
-        const li = document.createElement("li");
-        li.innerText = "Summary unavailable.";
-        newsSummaryEl.appendChild(li);
+        showSummaryMessage("Summary unavailable.");
         return;
       }
 
-      const bulletLines = summary
+      const lines = summary
         .split("\n")
         .map(line => line.trim())
         .filter(line => line.length > 0)
         .map(line => line.replace(/^[-•]\s*/, ""));
 
-      bulletLines.forEach(line => {
-        const li = document.createElement("li");
-        li.innerText = line;
-        newsSummaryEl.appendChild(li);
+      if (lines.length === 0) {
+        showSummaryMessage("Summary unavailable.");
+        return;
+      }
+
+      lines.forEach(line => {
+        const row = document.createElement("div");
+        row.className = "summary-row";
+
+        const bullet = document.createElement("div");
+        bullet.className = "summary-bullet";
+        bullet.innerText = "•";
+
+        const content = document.createElement("div");
+        content.className = "summary-content";
+        content.innerText = line;
+
+        row.appendChild(bullet);
+        row.appendChild(content);
+
+        newsSummaryEl.appendChild(row);
       });
     }
 
     function showSummaryMessage(message) {
       newsSummaryEl.innerHTML = "";
-      const li = document.createElement("li");
-      li.innerText = message;
-      newsSummaryEl.appendChild(li);
+
+      const row = document.createElement("div");
+      row.className = "summary-row";
+
+      const bullet = document.createElement("div");
+      bullet.className = "summary-bullet";
+      bullet.innerText = "•";
+
+      const content = document.createElement("div");
+      content.className = "summary-content";
+      content.innerText = message;
+
+      row.appendChild(bullet);
+      row.appendChild(content);
+
+      newsSummaryEl.appendChild(row);
     }
 
     function resetSummaryState() {
