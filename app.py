@@ -247,17 +247,24 @@ def get_google_news(
 
     news_list = []
 
-    for entry in feed.entries[:max_news]:
-        news_list.append(
-            {
-                "title": entry.get("title", ""),
-                "link": entry.get("link", ""),
-                "published": entry.get("published", ""),
-                "source": entry.get("source", {}).get("title", ""),
-            }
-        )
+    for entry in feed.entries:
+    published = entry.get("published", "").strip()
 
-    return news_list
+    # Skip articles with no publication date
+    if not published:
+        continue
+
+    news_list.append(
+        {
+            "title": entry.get("title", ""),
+            "link": entry.get("link", ""),
+            "published": published,
+            "source": entry.get("source", {}).get("title", ""),
+        }
+    )
+
+    if len(news_list) >= max_news:
+        break
 
 
 def summarize_news_with_chatgpt(
