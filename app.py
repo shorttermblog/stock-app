@@ -142,11 +142,7 @@ def resolve_stock_symbol(query: str):
     query = query.strip()
 
     if not query:
-        return {
-            "symbol": "",
-            "company_name": "",
-            "quote_type": "",
-        }
+        query = "AAPL"
 
     url = "https://query2.finance.yahoo.com/v1/finance/search"
 
@@ -273,17 +269,17 @@ def get_google_news(
         published = entry.get("published", "").strip()
         published_datetime = safe_parse_published_date(published)
 
-        # Skip articles with no date or invalid date
+        # Skip articles with no date or invalid date.
         if published_datetime is None:
             continue
 
-        # Make sure datetime is timezone-aware
+        # Make sure datetime is timezone-aware.
         if published_datetime.tzinfo is None:
             published_datetime = published_datetime.replace(tzinfo=timezone.utc)
 
         published_datetime_utc = published_datetime.astimezone(timezone.utc)
 
-        # Skip articles older than 24 hours
+        # Skip articles older than 24 hours.
         if published_datetime_utc < cutoff_utc:
             continue
 
@@ -400,8 +396,11 @@ def generate_news_summary(payload: NewsSummaryRequest):
 
 
 @app.get("/api/stock")
-def get_stock(ticker: str, start: str = None, end: str = None):
+def get_stock(ticker: str = "AAPL", start: str = None, end: str = None):
     try:
+        if not ticker or not ticker.strip():
+            ticker = "AAPL"
+
         resolved = resolve_stock_symbol(ticker)
 
         symbol = resolved["symbol"]
@@ -410,7 +409,7 @@ def get_stock(ticker: str, start: str = None, end: str = None):
 
         if not symbol:
             return {
-                "error": "Inserisci un nome valido, ad esempio Apple, Tesla, gold futures, Bitcoin USD o euro dollar."
+                "error": "Please enter a valid asset name, for example Apple, Tesla, gold futures, Bitcoin USD, or euro dollar."
             }
 
         stock = yf.Ticker(symbol)
@@ -445,7 +444,7 @@ def get_stock(ticker: str, start: str = None, end: str = None):
 
             if start_date >= end_date:
                 return {
-                    "error": "La data iniziale deve essere precedente alla data finale."
+                    "error": "The start date must be earlier than the end date."
                 }
 
             data = stock.history(
@@ -457,7 +456,7 @@ def get_stock(ticker: str, start: str = None, end: str = None):
 
         if data.empty or len(data) < 2:
             return {
-                "error": "Strumento non valido o pochi dati disponibili."
+                "error": "Invalid instrument or insufficient data available."
             }
 
         data = data.reset_index()
@@ -525,7 +524,7 @@ def get_stock(ticker: str, start: str = None, end: str = None):
 
     except ValueError:
         return {
-            "error": "Formato data non valido. Usa YYYY-MM-DD."
+            "error": "Invalid date format. Use YYYY-MM-DD."
         }
 
     except Exception:
