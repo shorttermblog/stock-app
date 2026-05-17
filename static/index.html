@@ -395,7 +395,7 @@
 
     <form class="controls" id="assetForm">
       <div class="asset-search">
-        <input id="ticker" value="Apple" placeholder="Asset" autocomplete="off">
+        <input id="ticker" value="AAPL" placeholder="Asset" autocomplete="off">
         <div id="suggestions" class="suggestions"></div>
       </div>
 
@@ -627,7 +627,7 @@
         return;
       }
 
-      tickerInput.value = item.name || item.symbol;
+      tickerInput.value = item.symbol;
       tickerInput.dataset.symbol = item.symbol;
       tickerInput.dataset.name = item.name || item.symbol;
       tickerInput.dataset.quoteType = item.quote_type || "";
@@ -706,15 +706,10 @@
     async function load() {
       const inputValue = tickerInput.value.trim();
       const selectedSymbol = tickerInput.dataset.symbol || "";
-      const t = selectedSymbol || inputValue;
+      const t = selectedSymbol || inputValue || "AAPL";
 
       const s = document.getElementById("start").value;
       const e = document.getElementById("end").value;
-
-      if (!t) {
-        alert("Insert an asset, for example Apple, Tesla, QQQ, gold futures, Bitcoin USD or euro dollar.");
-        return;
-      }
 
       hideSuggestions();
       resetSummaryState();
@@ -733,6 +728,11 @@
       }
 
       currentAsset = data;
+
+      tickerInput.value = data.ticker || "AAPL";
+      tickerInput.dataset.symbol = data.ticker || "AAPL";
+      tickerInput.dataset.name = data.asset_name || data.company_name || data.ticker || "AAPL";
+      tickerInput.dataset.quoteType = data.quote_type || "";
 
       const changeEl = document.getElementById("changeCard");
 
@@ -1003,6 +1003,10 @@
     });
 
     setDefaultDates();
+
+    tickerInput.value = "AAPL";
+    tickerInput.dataset.symbol = "AAPL";
+
     load();
   </script>
 </body>
